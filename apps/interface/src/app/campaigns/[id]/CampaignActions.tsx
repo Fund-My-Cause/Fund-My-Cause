@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useWallet } from "@/context/WalletContext";
+import { useAccountExists } from "@/hooks/useAccountExists";
 import { PledgeModal } from "@/components/ui/PledgeModal";
 import { fetchContribution } from "@/lib/soroban";
 
@@ -23,6 +24,7 @@ export function CampaignActions({
   status,
 }: Props) {
   const { address, connect } = useWallet();
+  const { exists: accountExists, loading: accountLoading } = useAccountExists(address);
   const [pledging, setPledging] = useState(false);
   const [userContribution, setUserContribution] = useState(0);
   const [txStatus, setTxStatus] = useState<"idle" | "pending" | "done" | "error">("idle");
@@ -68,6 +70,13 @@ export function CampaignActions({
   return (
     <>
       <div className="flex flex-col gap-3">
+        {/* Unfunded account warning */}
+        {address && !accountLoading && !accountExists && (
+          <div className="bg-yellow-900/50 border border-yellow-600 rounded-xl px-4 py-3 text-yellow-200 text-sm">
+            Your wallet account is not funded on the Stellar network. Please fund it before attempting any transactions.
+          </div>
+        )}
+
         {/* Pledge — always visible when campaign is active */}
         {status === "Active" && !deadlinePassed && (
           <button

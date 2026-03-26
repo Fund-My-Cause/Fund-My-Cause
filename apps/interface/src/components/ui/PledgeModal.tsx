@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { useWallet } from "@/context/WalletContext";
+import { useAccountExists } from "@/hooks/useAccountExists";
 import { TransactionStatus, TxStatus } from "@/components/ui/TransactionStatus";
 import { useToast } from "@/components/ui/Toast";
 
@@ -13,6 +14,7 @@ interface PledgeModalProps {
 
 export function PledgeModal({ campaignTitle, onClose }: PledgeModalProps) {
   const { address, connect } = useWallet();
+  const { exists: accountExists, loading: accountLoading } = useAccountExists(address);
   const { addToast } = useToast();
   const [amount, setAmount] = useState("");
   const [txStatus, setTxStatus] = useState<TxStatus>("idle");
@@ -67,6 +69,11 @@ export function PledgeModal({ campaignTitle, onClose }: PledgeModalProps) {
           <TransactionStatus status={txStatus} />
         ) : (
           <>
+            {address && !accountLoading && !accountExists && (
+              <div className="bg-yellow-900/50 border border-yellow-600 rounded-xl px-4 py-3 text-yellow-200 text-sm">
+                This wallet account is not funded on the Stellar network. Transactions will fail until the account is activated with a minimum XLM balance.
+              </div>
+            )}
             <input
               type="number"
               placeholder="Amount in XLM"
@@ -76,7 +83,7 @@ export function PledgeModal({ campaignTitle, onClose }: PledgeModalProps) {
             />
             <button
               onClick={handlePledge}
-              disabled={txStatus !== "idle"}
+              disabled={txStatus !== "idle" || (!!address && !accountLoading && !accountExists)}
               className="w-full bg-indigo-600 hover:bg-indigo-500 py-2 rounded-xl font-medium transition disabled:opacity-50"
             >
               {txStatus !== "idle" ? "Processing..." : address ? "Confirm Pledge" : "Connect Wallet to Pledge"}
