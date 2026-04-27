@@ -107,7 +107,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download WASM artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mainnet-wasm-${{ github.event.inputs.version_tag }}
           path: wasm
