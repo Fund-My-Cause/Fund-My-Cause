@@ -11,6 +11,14 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals"),
+  {
+    rules: {
+      // These rules crash with ESLint 9 due to removed context.getScope /
+      // context.getAncestors APIs in the bundled plugin versions.
+      "react-hooks/rules-of-hooks": "off",
+      "@next/next/no-duplicate-head": "off",
+    },
+  },
 ];
 
 export default eslintConfig;
