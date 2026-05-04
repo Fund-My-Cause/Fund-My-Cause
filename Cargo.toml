@@ -6,7 +6,7 @@ members = [
 exclude = ["contracts/benchmarks"]
 
 [workspace.dependencies]
-soroban-sdk = "25.3.0"
+soroban-sdk = "25.3.1"
 
 [profile.release]
 opt-level = "z"
