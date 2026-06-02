@@ -29,7 +29,7 @@
     "next-intl": "^4.9.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "tailwind-merge": "3.5.0"
+    "tailwind-merge": "3.6.0"
   },
   "devDependencies": {
     "@axe-core/react": "^4.8.0",
