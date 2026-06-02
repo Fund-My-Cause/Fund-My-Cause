@@ -27,8 +27,8 @@
     "lucide-react": "0.577.0",
     "next": "16.1.6",
     "next-intl": "^4.9.1",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
     "tailwind-merge": "3.5.0"
   },
   "devDependencies": {
@@ -40,10 +40,10 @@
     "@testing-library/user-event": "14.6.1",
     "@types/jest": "30.0.0",
     "@types/node": "20.19.37",
-    "@types/react": "19.2.14",
+    "@types/react": "19.2.16",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.1",
-    "@vitest/coverage-v8": "4.1.2",
+    "@vitejs/plugin-react": "6.0.2",
+    "@vitest/coverage-v8": "4.1.8",
     "axe-core": "^4.8.0",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.35",
@@ -55,8 +55,8 @@
     "jsdom": "26.1.0",
     "prettier": "^3.8.3",
     "tailwindcss": "4.2.2",
-    "ts-jest": "29.4.6",
+    "ts-jest": "29.4.11",
     "typescript": "5.9.3",
-    "vitest": "4.1.2"
+    "vitest": "4.1.8"
   }
 }
