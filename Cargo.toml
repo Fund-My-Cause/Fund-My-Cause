@@ -11,7 +11,7 @@ exclude = ["contracts/benchmarks"]
 output-dir = "target/doc"
 
 [workspace.dependencies]
-soroban-sdk = "25.3.0"
+soroban-sdk = "26.1.0"
 insta = { version = "1.37", features = ["redactions"] }
 
 [profile.release]
