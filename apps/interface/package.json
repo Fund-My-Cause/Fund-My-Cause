@@ -32,7 +32,7 @@
     "@walletconnect/sign-client": "2.23.9",
     "clsx": "2.1.1",
     "framer-motion": "12.38.0",
-    "graphql": "^16.8.0",
+    "graphql": "^17.0.2",
     "graphql-request": "^7.4.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
