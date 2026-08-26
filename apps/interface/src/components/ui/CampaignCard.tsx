@@ -24,7 +24,7 @@ function StatusBadge({ status }: { status: "funded" | "ended" }) {
   );
 }
 
-export function CampaignCard({ campaign, onPledge }: CampaignCardProps) {
+function CampaignCardImpl({ campaign, onPledge }: CampaignCardProps) {
   const progress = campaign.goal > 0 ? (campaign.raised / campaign.goal) * 100 : 0;
   const isFunded = progress >= 100;
   const isEnded = !isFunded && new Date(campaign.deadline) < new Date();
@@ -58,3 +58,5 @@ export function CampaignCard({ campaign, onPledge }: CampaignCardProps) {
     </div>
   );
 }
+
+export const CampaignCard = React.memo(CampaignCardImpl);

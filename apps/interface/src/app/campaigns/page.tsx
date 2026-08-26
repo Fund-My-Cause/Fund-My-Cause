@@ -1,50 +1,6 @@
-import React, { Suspense } from "react";
-import { Navbar } from "@/components/layout/Navbar";
-import { CampaignCard } from "@/components/ui/CampaignCard";
-import { fetchAllCampaigns } from "@/lib/soroban";
-import type { Campaign } from "@/types/campaign";
-import { LoadingSkeletonGrid } from "@/components/ui/LoadingSkeleton";
-
-// ── Campaign grid (async server component) ────────────────────────────────────
-
-async function CampaignGrid() {
-  const onChain = await fetchAllCampaigns();
-
-  // Map on-chain data to Campaign shape; fall back to placeholder image
-  const campaigns: Campaign[] = onChain.map((c) => ({
-    id: c.contractId,
-    title: c.title,
-    description: c.description,
-    raised: c.raised,
-    goal: c.goal,
-    deadline: c.deadline,
-    image: "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&q=80&w=800",
-    contractId: c.contractId,
-  }));
-
-  if (campaigns.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32 text-center space-y-4">
-        <p className="text-5xl">🌱</p>
-        <h2 className="text-xl font-semibold text-white">No campaigns yet</h2>
-        <p className="text-gray-400 max-w-sm">
-          Be the first to launch a campaign on Fund-My-Cause and start raising funds on Stellar.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {campaigns.map((c) => <CampaignCard key={c.id} campaign={c} />)}
-    </div>
-  );
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 "use client";
 
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useCallback, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { CampaignCard } from "@/components/ui/CampaignCard";
@@ -98,7 +54,7 @@ const ALL_CAMPAIGNS: Campaign[] = [
 type FilterTab = "all" | "active" | "funded" | "ended";
 type SortOption = "newest" | "most-funded" | "ending-soon";
 
-// ── Helpers ───────────────────────────────────────────────name────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getStatus(c: Campaign): FilterTab {
   const ended = new Date(c.deadline) < new Date();
@@ -177,6 +133,8 @@ function CampaignsInner() {
   const currentPage = Math.min(page, totalPages);
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
+  const handlePledge = useCallback((id: string) => setPledge(id), []);
+
   return (
     <>
       {/* Controls */}
@@ -233,7 +191,7 @@ function CampaignsInner() {
               <CampaignCard
                 key={campaign.id}
                 campaign={campaign}
-                onPledge={(id) => setPledge(id)}
+                onPledge={handlePledge}
               />
             ))}
           </div>
@@ -279,13 +237,6 @@ export default function CampaignsPage() {
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white">
       <Navbar />
-      <section className="max-w-6xl mx-auto px-6 py-12">
-        <h1 className="text-3xl font-bold mb-8">Active Campaigns</h1>
-        <Suspense fallback={<LoadingSkeletonGrid count={6} />}>
-          {/* @ts-expect-error async server component */}
-          <CampaignGrid />
-        </Suspense>
-      </section>
       <div className="max-w-6xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-8">Campaigns</h1>
         <Suspense fallback={<div className="text-gray-500 text-center py-20">Loading...</div>}>

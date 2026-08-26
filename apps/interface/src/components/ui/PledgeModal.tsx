@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useWallet } from "@/context/WalletContext";
 import { TransactionStatus, TxStatus } from "@/components/ui/TransactionStatus";
@@ -11,12 +11,53 @@ interface PledgeModalProps {
   onClose: () => void;
 }
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+const TITLE_ID = "pledge-modal-title";
+
 export function PledgeModal({ campaignTitle, onClose }: PledgeModalProps) {
   const { address, connect } = useWallet();
   const { addToast } = useToast();
   const [amount, setAmount] = useState("");
   const [txStatus, setTxStatus] = useState<TxStatus>("idle");
   const [txHash, setTxHash] = useState<string>("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Trap focus, close on Escape, and restore focus to the trigger element on unmount.
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    const focusable = dialog?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+    focusable?.[0]?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !dialog) return;
+
+      const nodes = dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (nodes.length === 0) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [onClose]);
 
   const handlePledge = async () => {
     if (!address) {
@@ -51,10 +92,18 @@ export function PledgeModal({ campaignTitle, onClose }: PledgeModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-gray-700 space-y-4">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={TITLE_ID}
+        className="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-gray-700 space-y-4"
+      >
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-semibold">Pledge to {campaignTitle}</h2>
-          <button onClick={onClose}><X size={20} /></button>
+          <h2 id={TITLE_ID} className="text-lg font-semibold">Pledge to {campaignTitle}</h2>
+          <button onClick={onClose} aria-label="Close">
+            <X size={20} />
+          </button>
         </div>
 
         {txStatus === "success" || txStatus === "error" ? (
