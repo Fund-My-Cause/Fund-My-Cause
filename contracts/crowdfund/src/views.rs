@@ -199,9 +199,15 @@ pub(crate) fn get_vested_amount(env: Env) -> i128 {
         return 0;
     }
 
+    // Issue #1145: use checked_mul to prevent overflow on large totals
     let platform_fee = inst
         .get::<_, PlatformConfig>(&KEY_PLATFORM)
-        .map(|c| total * c.fee_bps as i128 / 10_000)
+        .map(|c| {
+            total
+                .checked_mul(c.fee_bps as i128)
+                .and_then(|v| v.checked_div(10_000))
+                .unwrap_or(0)
+        })
         .unwrap_or(0);
     let payout = total - platform_fee;
 
@@ -216,7 +222,12 @@ pub(crate) fn get_vested_amount(env: Env) -> i128 {
         return payout;
     }
     let elapsed = now - v.cliff;
-    payout * elapsed as i128 / v.duration as i128
+    let duration = v.duration as i128;
+    // Issue #1145: use checked_mul to prevent overflow on large payout * elapsed
+    payout
+        .checked_mul(elapsed as i128)
+        .and_then(|product| product.checked_div(duration))
+        .unwrap_or(payout)
 }
 
 // === History getters

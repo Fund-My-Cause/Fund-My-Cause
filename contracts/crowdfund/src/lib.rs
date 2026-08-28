@@ -1515,7 +1515,7 @@ impl CrowdfundContract {
             .votes_for
             .checked_add(proposal.votes_against)
             .ok_or(ContractError::Overflow)?;
-        if total_votes > 0 && proposal.votes_for * 2 > total_votes {
+        if total_votes > 0 && (proposal.votes_for as u64) * 2 > total_votes as u64 {
             inst.set(&KEY_DEADLINE, &proposal.new_deadline);
             env.events().publish(
                 ("campaign", "extension_executed"),
@@ -3823,6 +3823,14 @@ impl CrowdfundContract {
         // Use i128 arithmetic; scale by 1e9 to preserve precision
         let seconds_per_year: i128 = 365 * 24 * 3600;
         let share_numerator = contrib_amount;
+        // Issue #1145: guard the divisor against overflow and zero-division
+        let divisor = (10_000i128)
+            .checked_mul(seconds_per_year)
+            .and_then(|v| v.checked_mul(total_raised))
+            .ok_or(ContractError::Overflow)?;
+        if divisor == 0 {
+            return Ok(0);
+        }
         let accrued = config
             .pool
             .checked_mul(config.rate_bps as i128)
@@ -3831,7 +3839,8 @@ impl CrowdfundContract {
             .ok_or(ContractError::Overflow)?
             .checked_mul(share_numerator)
             .ok_or(ContractError::Overflow)?
-            / (10_000 * seconds_per_year * total_raised);
+            .checked_div(divisor)
+            .unwrap_or(0);
 
         let yield_key = DataKey::YieldInfo(contributor.clone());
         let info: YieldInfo = env
@@ -3919,12 +3928,19 @@ impl CrowdfundContract {
         let elapsed = now.saturating_sub(config.start_time).min(365 * 24 * 3600);
         let seconds_per_year: i128 = 365 * 24 * 3600;
 
+        // Issue #1145: guard divisor against overflow and zero-division
+        let divisor = (10_000i128)
+            .saturating_mul(seconds_per_year)
+            .saturating_mul(total_raised);
+        if divisor == 0 {
+            return 0;
+        }
         let accrued = config
             .pool
             .saturating_mul(config.rate_bps as i128)
             .saturating_mul(elapsed as i128)
             .saturating_mul(contrib_amount)
-            / (10_000 * seconds_per_year * total_raised);
+            / divisor;
 
         let info: YieldInfo = env
             .storage()
