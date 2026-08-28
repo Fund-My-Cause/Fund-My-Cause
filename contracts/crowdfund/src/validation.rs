@@ -353,7 +353,7 @@ pub(crate) fn validate_goal_not_overflow(goal: i128) -> Result<(), ContractError
 /// # Returns
 /// * `Ok(())` for any valid `Category` variant
 /// * `Err(ContractError::InvalidCategory)` for unrecognised values
-pub(crate) fn validate_category(category: &Category) -> Result<(), ContractError> {
+pub(crate) fn validate_category(category: Category) -> Result<(), ContractError> {
     match category {
         Category::Charity
         | Category::Technology

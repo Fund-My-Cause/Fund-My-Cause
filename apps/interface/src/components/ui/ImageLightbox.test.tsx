@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { ImageLightbox, MediaGallery, LightboxImage } from "../ImageLightbox";
+import { ImageLightbox, MediaGallery, LightboxImage } from "./ImageLightbox";
 
 const images: LightboxImage[] = [
   { thumb: "/thumb1.jpg", hiRes: "/hi1.jpg", alt: "Photo one" },

@@ -16,6 +16,7 @@ export const vi = {
   restoreAllMocks: () => jest.restoreAllMocks(),
   useFakeTimers: () => jest.useFakeTimers(),
   useRealTimers: () => jest.useRealTimers(),
+  setSystemTime: (time: Date | number | string) => jest.setSystemTime(time),
   advanceTimersByTime: (ms: number) => jest.advanceTimersByTime(ms),
   runAllTimers: () => jest.runAllTimers(),
 };

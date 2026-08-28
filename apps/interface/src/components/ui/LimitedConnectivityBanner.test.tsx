@@ -1,5 +1,5 @@
 import { render, screen, act } from "@testing-library/react";
-import { LimitedConnectivityBanner, StaleBadge } from "../LimitedConnectivityBanner";
+import { LimitedConnectivityBanner, StaleBadge } from "./LimitedConnectivityBanner";
 import { rpcFailure, rpcSuccess, rpcReset, RPC_FAILURE_THRESHOLD } from "@/lib/rpc-cache";
 
 beforeEach(() => {

@@ -22,7 +22,9 @@ use crate::error::CommonError;
 ///
 /// # Returns
 /// * `Ok(())` if `amount > 0`
-/// * `Err(CommonError::InvalidInput)` otherwise
+///
+/// # Errors
+/// * [`CommonError::InvalidInput`] if `amount` is zero or negative.
 pub fn validate_positive_amount(amount: i128) -> Result<(), CommonError> {
     if amount <= 0 {
         return Err(CommonError::InvalidInput);

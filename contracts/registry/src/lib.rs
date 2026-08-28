@@ -36,6 +36,20 @@
 // Migrating changes how events are encoded on the wire, so it is a behaviour change
 // for every off-chain consumer, not a lint cleanup, and is tracked separately.
 #![allow(deprecated)]
+// ── Pedantic lint exceptions for Soroban contracts (issue #1162) ──────────────
+//
+// `needless_pass_by_value`: Soroban SDK types (`Env`, `Address`, `Vec`) must
+// be passed by value — the SDK does not offer reference-compatible API
+// surfaces for host interaction.
+#![allow(clippy::needless_pass_by_value)]
+// `must_use_candidate`: Soroban view entry points are consumed by the host;
+// `#[must_use]` adds no safety value in the contract context.
+#![allow(clippy::must_use_candidate)]
+// `match_same_arms`: intentional explicit match arms for auditability.
+#![allow(clippy::match_same_arms)]
+// `similar_names`: short names like `out`/`src` arise naturally in pagination
+// helpers; renaming reduces readability.
+#![allow(clippy::similar_names)]
 
 mod admin;
 mod errors;

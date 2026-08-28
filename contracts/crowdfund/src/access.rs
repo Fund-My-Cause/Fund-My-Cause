@@ -8,7 +8,6 @@ use soroban_sdk::{Address, Env};
 
 use crate::{
     errors::ContractError,
-    helpers::require_auth_creator,
     storage::{
         DataKey, KEY_ADMIN, KEY_CREATOR, KEY_PAUSE_TIMELOCK, KEY_RATE_LIMIT, KEY_STATUS,
         KEY_UNPAUSE_AFTER, KEY_VISIBILITY, TTL_PERSISTENT_ENTRY,
@@ -21,6 +20,27 @@ use crate::{
         RateLimit, Status, Visibility,
     },
 };
+
+/// Reads the campaign creator and requires their authorization, without any
+/// status check.
+///
+/// Access-control changes (whitelist, blacklist, visibility, ownership) are
+/// deliberately allowed on a non-Active campaign: a creator still has to be able
+/// to correct an access list after the campaign is paused or has ended. Only
+/// `pause()` gates on `Status::Active`, and it checks that itself.
+///
+/// # Returns
+/// - `Ok(Address)` with the creator's address, having required their auth
+/// - `Err(ContractError::InvalidAddress)` if the contract was never initialized
+pub(crate) fn require_auth_creator(env: &Env) -> Result<Address, ContractError> {
+    let creator: Address = env
+        .storage()
+        .instance()
+        .get(&KEY_CREATOR)
+        .ok_or(ContractError::InvalidAddress)?;
+    creator.require_auth();
+    Ok(creator)
+}
 
 /// Reads the admin address, mapping an un-initialised contract to a typed error.
 ///

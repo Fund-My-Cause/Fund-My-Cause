@@ -1,4 +1,5 @@
 import { getCampaignInfo, getCampaignStats, contribute, ContractError } from "./contract";
+import { cacheClear } from "./rpc-cache";
 
 // ── Minimal ScVal stand-ins ───────────────────────────────────────────────────
 // We avoid jest.requireActual(@stellar/stellar-sdk) because the minified bundle
@@ -6,6 +7,9 @@ import { getCampaignInfo, getCampaignStats, contribute, ContractError } from "./
 
 const mockSimulateTransaction = jest.fn();
 const mockSendTransaction = jest.fn();
+const mockPrepareTransaction = jest.fn();
+const mockLoadAccount = jest.fn();
+const mockGetTransaction = jest.fn();
 
 // Tiny ScVal wrapper — just needs to round-trip through scValToNative
 function scv(value: unknown) {
@@ -13,9 +17,15 @@ function scv(value: unknown) {
 }
 
 jest.mock("@stellar/stellar-sdk", () => {
-  class MockServer {
+  class MockRpcServer {
     simulateTransaction = mockSimulateTransaction;
     sendTransaction = mockSendTransaction;
+    prepareTransaction = mockPrepareTransaction;
+    getTransaction = mockGetTransaction;
+  }
+
+  class MockHorizonServer {
+    loadAccount = mockLoadAccount;
   }
 
   class MockContract {
@@ -37,24 +47,35 @@ jest.mock("@stellar/stellar-sdk", () => {
         toEnvelope: () => ({ toXDR: () => Buffer.from(xdr, "base64") }),
       };
     }
-    static fromXDR(xdr: string) { return { xdr }; }
+    static fromXDR(xdr: string) { return { toXDR: () => xdr }; }
   }
 
   class MockAccount {
     constructor(public id: string, public seq: string) {}
   }
 
+  class MockAddress {
+    constructor(public addr: string) {}
+    toScVal() { return scv(this.addr); }
+    static fromString(s: string) { return new MockAddress(s); }
+  }
+
   return {
     Contract: MockContract,
     TransactionBuilder: MockTransactionBuilder,
     Account: MockAccount,
+    Address: MockAddress,
     BASE_FEE: "100",
     Networks: { TESTNET: "Test SDF Network ; September 2015" },
     nativeToScVal: (v: unknown) => scv(v),
     scValToNative: (v: { __value: unknown }) => v.__value,
+    Horizon: { Server: MockHorizonServer },
     rpc: {
-      Server: MockServer,
-      Api: { isSimulationError: (r: { error?: string }) => Boolean(r.error) },
+      Server: MockRpcServer,
+      Api: {
+        isSimulationError: (r: { error?: string }) => Boolean(r.error),
+        GetTransactionStatus: { SUCCESS: "SUCCESS", FAILED: "FAILED" },
+      },
     },
   };
 });
@@ -65,9 +86,12 @@ function simSuccess(value: unknown) {
   return { result: { retval: scv(value) } };
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  cacheClear();
+});
 
-const CONTRACT_ID = "CABC1234";
+const CONTRACT_ID = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4";
 const CONTRIBUTOR = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN";
 
 // ── getCampaignInfo ───────────────────────────────────────────────────────────
@@ -79,7 +103,9 @@ describe("getCampaignInfo", () => {
       .mockResolvedValueOnce(simSuccess("Ocean cleanup"))
       .mockResolvedValueOnce(simSuccess(CONTRIBUTOR))
       .mockResolvedValueOnce(simSuccess(10000n))
-      .mockResolvedValueOnce(simSuccess(1800000000n));
+      .mockResolvedValueOnce(simSuccess(1800000000n))
+      .mockResolvedValueOnce(simSuccess(10n))     // min_contribution
+      .mockResolvedValueOnce(simSuccess(5000n));  // max_contribution
 
     const info = await getCampaignInfo(CONTRACT_ID);
 
@@ -123,9 +149,23 @@ describe("getCampaignStats", () => {
 // ── contribute ────────────────────────────────────────────────────────────────
 
 describe("contribute", () => {
+  // The `contribute` function calls simulateView(contractId, "token") before
+  // invoking the contract, then uses Horizon to load account, then prepares,
+  // signs, sends, and polls.
+  const TOKEN_ID = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4";
+
+  beforeEach(() => {
+    // Mock loadAccount to return a minimal account-like object
+    mockLoadAccount.mockResolvedValue({ id: CONTRIBUTOR, sequence: "0" });
+    // Mock prepareTransaction to return the tx unchanged (passes through toXDR)
+    mockPrepareTransaction.mockImplementation(async (tx: { toXDR: () => string }) => tx);
+  });
+
   it("builds the correct transaction and calls signTx", async () => {
     const signTx = jest.fn().mockImplementation(async (xdr: string) => xdr);
+    mockSimulateTransaction.mockResolvedValueOnce(simSuccess(TOKEN_ID)); // token lookup
     mockSendTransaction.mockResolvedValue({ status: "PENDING", hash: "abc123" });
+    mockGetTransaction.mockResolvedValue({ status: "SUCCESS" });
 
     const hash = await contribute(CONTRACT_ID, CONTRIBUTOR, 100n, signTx);
 
@@ -138,9 +178,13 @@ describe("contribute", () => {
 
   it("throws ContractError when sendTransaction returns ERROR status", async () => {
     const signTx = jest.fn().mockImplementation(async (xdr: string) => xdr);
+    mockSimulateTransaction.mockResolvedValueOnce(simSuccess(TOKEN_ID)); // token lookup
     mockSendTransaction.mockResolvedValue({ status: "ERROR", errorResult: "op_bad_auth" });
 
+    // The implementation throws "Submit failed: ..." when sendTransaction returns ERROR
     await expect(contribute(CONTRACT_ID, CONTRIBUTOR, 100n, signTx)).rejects.toThrow(ContractError);
-    await expect(contribute(CONTRACT_ID, CONTRIBUTOR, 100n, signTx)).rejects.toThrow("Transaction failed");
+
+    mockSimulateTransaction.mockResolvedValueOnce(simSuccess(TOKEN_ID)); // token lookup (token is not cached after error)
+    await expect(contribute(CONTRACT_ID, CONTRIBUTOR, 100n, signTx)).rejects.toThrow("Submit failed");
   });
 });

@@ -67,7 +67,7 @@ pub(crate) fn initialize(
     )?;
     validate_string_length(&title, 64)?;
     validate_string_length(&description, 512)?;
-    validate_category(&category)?;
+    validate_category(category)?;
 
     if let Some(ref config) = platform_config {
         validate_fee_bps(config.fee_bps)?;

@@ -19,3 +19,8 @@ soroban-sdk = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+
+# Inherit the workspace-level clippy pedantic configuration (issue #1162).
+# Contract-specific exceptions are documented with #[allow] in the source.
+[lints]
+workspace = true

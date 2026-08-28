@@ -26,3 +26,14 @@ lto = true
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
+
+# ── Workspace-wide lint configuration ────────────────────────────────────────
+# Issue #1162: Add clippy lint enforcement with pedantic rules for contracts/*
+[workspace.lints.clippy]
+# Pedantic lints — catches subtle bugs and style issues across the whole
+# workspace.  Priority = -1 so that individual crate-level `[lints]` entries
+# that set a lint to "allow" can still override this baseline.
+pedantic = { level = "warn", priority = -1 }
+# Wildcard imports make it hard to know where names come from; deny them
+# unconditionally so the contract's public surface stays auditable.
+wildcard_imports = "deny"

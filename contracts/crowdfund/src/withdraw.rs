@@ -33,7 +33,7 @@ use crate::{
 fn deduct_platform_fee(
     env: &Env,
     token_client: &token::Client,
-    platform_config: &Option<PlatformConfig>,
+    platform_config: Option<&PlatformConfig>,
     base: i128,
     respect_fee_mode: bool,
 ) -> i128 {
@@ -58,12 +58,11 @@ fn deduct_platform_fee(
 /// the withdraw path is unchanged.
 fn apply_vesting_schedule(
     now: u64,
-    vesting: &Option<VestingSchedule>,
+    vesting: Option<&VestingSchedule>,
     payout: i128,
 ) -> Result<i128, ContractError> {
-    let v = match vesting {
-        Some(v) => v,
-        None => return Ok(payout),
+    let Some(v) = vesting else {
+        return Ok(payout);
     };
 
     if now < v.cliff {
@@ -115,11 +114,11 @@ pub(crate) fn withdraw(env: Env) -> Result<(), ContractError> {
     let token_client = token::Client::new(&env, &token_address);
 
     // === Calculate fee and payout
-    let fee = deduct_platform_fee(&env, &token_client, &platform_config, total, true);
+    let fee = deduct_platform_fee(&env, &token_client, platform_config.as_ref(), total, true);
     let mut payout = total - fee;
 
     // === Apply vesting if configured
-    let vested = apply_vesting_schedule(now, &vesting, payout)?;
+    let vested = apply_vesting_schedule(now, vesting.as_ref(), payout)?;
     token_client.transfer(&env.current_contract_address(), &creator, &vested);
     payout = vested;
 
@@ -238,7 +237,7 @@ pub(crate) fn claim_stream(env: Env) -> Result<(), ContractError> {
     let token_address: Address = inst.get(&KEY_TOKEN).unwrap();
     let token_client = token::Client::new(&env, &token_address);
     let fee = if stream.claimed == 0 {
-        deduct_platform_fee(&env, &token_client, &platform_config, total, false)
+        deduct_platform_fee(&env, &token_client, platform_config.as_ref(), total, false)
     } else {
         0
     };

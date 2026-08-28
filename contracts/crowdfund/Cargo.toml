@@ -32,3 +32,8 @@ common = { path = "../common" }
 soroban-sdk = { workspace = true, features = ["testutils"] }
 common = { path = "../common", features = ["testutils"] }
 proptest = "1.4"
+
+# Inherit the workspace-level clippy pedantic configuration (issue #1162).
+# Contract-specific exceptions are documented with #[allow] in the source.
+[lints]
+workspace = true

@@ -14,7 +14,10 @@ describe("constants", () => {
   });
 
   it("uses mainnet passphrase and name when NEXT_PUBLIC_NETWORK=mainnet", async () => {
-    process.env = { ...ORIGINAL_ENV, NEXT_PUBLIC_NETWORK: "mainnet" };
+    process.env = {
+      ...ORIGINAL_ENV,
+      NEXT_PUBLIC_NETWORK_PASSPHRASE: "Public Global Stellar Network ; September 2015",
+    };
     const { NETWORK_PASSPHRASE, NETWORK_NAME } = await import("./constants");
     expect(NETWORK_PASSPHRASE).toBe("Public Global Stellar Network ; September 2015");
     expect(NETWORK_NAME).toBe("mainnet");

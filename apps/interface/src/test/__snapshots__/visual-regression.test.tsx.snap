@@ -231,6 +231,116 @@ exports[`Visual Regression - Layouts should render responsive grid consistently 
 </div>
 `;
 
+exports[`Visual Regression - Skeleton States (#1112) should render CampaignDetailSkeleton consistently 1`] = `
+<div
+  aria-busy="true"
+  aria-label="Loading campaign details"
+  class="mx-auto max-w-3xl space-y-8 px-6 py-10 animate-pulse"
+  data-testid="campaign-detail-skeleton"
+>
+  <div
+    class="skeleton-shimmer w-full h-56 rounded-2xl"
+  />
+  <div
+    class="space-y-2"
+  >
+    <div
+      class="skeleton-shimmer rounded h-8 w-3/4"
+    />
+    <div
+      class="flex items-center gap-3"
+    >
+      <div
+        class="skeleton-shimmer h-4 w-8 rounded-full"
+      />
+      <div
+        class="skeleton-shimmer rounded h-4 w-40"
+      />
+    </div>
+  </div>
+  <div
+    class="space-y-2"
+  >
+    <div
+      class="skeleton-shimmer h-3 rounded-full w-full"
+    />
+    <div
+      class="flex items-center gap-3 justify-between"
+    >
+      <div
+        class="skeleton-shimmer rounded h-4 w-32"
+      />
+      <div
+        class="skeleton-shimmer rounded h-4 w-20"
+      />
+    </div>
+  </div>
+  <div
+    class="grid grid-cols-3 gap-4"
+  >
+    <div
+      class="ds-card p-4 space-y-2"
+    >
+      <div
+        class="skeleton-shimmer rounded h-3 w-1/2"
+      />
+      <div
+        class="skeleton-shimmer rounded h-6 w-2/3"
+      />
+    </div>
+    <div
+      class="ds-card p-4 space-y-2"
+    >
+      <div
+        class="skeleton-shimmer rounded h-3 w-1/2"
+      />
+      <div
+        class="skeleton-shimmer rounded h-6 w-2/3"
+      />
+    </div>
+    <div
+      class="ds-card p-4 space-y-2"
+    >
+      <div
+        class="skeleton-shimmer rounded h-3 w-1/2"
+      />
+      <div
+        class="skeleton-shimmer rounded h-6 w-2/3"
+      />
+    </div>
+  </div>
+  <div
+    class="space-y-2"
+  >
+    <div
+      class="skeleton-shimmer rounded h-4 w-full"
+    />
+    <div
+      class="skeleton-shimmer rounded h-4 w-5/6"
+    />
+    <div
+      class="skeleton-shimmer rounded h-4 w-4/5"
+    />
+    <div
+      class="skeleton-shimmer rounded h-4 w-3/4"
+    />
+  </div>
+  <div
+    class="flex gap-3"
+  >
+    <div
+      class="skeleton-shimmer h-10 flex-1 rounded-xl"
+    />
+    <div
+      class="skeleton-shimmer h-10 w-28 rounded-xl"
+    />
+  </div>
+  <div
+    class="skeleton-shimmer h-10 rounded-xl w-full"
+  />
+</div>
+`;
+
 exports[`Visual Regression - States should render button states consistently 1`] = `
 <div
   class="flex gap-4"

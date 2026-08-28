@@ -174,7 +174,10 @@ export function formatLocalDate(
   locale: string = "en",
   options?: Intl.DateTimeFormatOptions,
 ): string {
-  const dateObj = typeof date === "number" ? new Date(date * 1000) : date;
+  if (date == null) return "Invalid Date";
+  const dateObj =
+    typeof date === "number" ? new Date(date * 1000) : new Date(date as any);
+  if (isNaN(dateObj.getTime())) return "Invalid Date";
   const intlCode = localeToIntlCode(locale);
   return dateObj.toLocaleDateString(intlCode, options);
 }
@@ -185,7 +188,10 @@ export function formatLocalTime(
   locale: string = "en",
   options?: Intl.DateTimeFormatOptions,
 ): string {
-  const dateObj = typeof date === "number" ? new Date(date * 1000) : date;
+  if (date == null) return "Invalid Date";
+  const dateObj =
+    typeof date === "number" ? new Date(date * 1000) : new Date(date as any);
+  if (isNaN(dateObj.getTime())) return "Invalid Date";
   const intlCode = localeToIntlCode(locale);
   return dateObj.toLocaleTimeString(intlCode, options);
 }
@@ -207,7 +213,10 @@ export function formatLocalDateTime(
   locale: string = "en",
   options?: Intl.DateTimeFormatOptions,
 ): string {
-  const dateObj = typeof date === "number" ? new Date(date * 1000) : date;
+  if (date == null) return "Invalid Date";
+  const dateObj =
+    typeof date === "number" ? new Date(date * 1000) : new Date(date as any);
+  if (isNaN(dateObj.getTime())) return "Invalid Date";
   const intlCode = localeToIntlCode(locale);
   return dateObj.toLocaleString(intlCode, options);
 }
@@ -231,10 +240,12 @@ export function formatRelativeTime(
   pastDate: Date | number,
   locale: string = "en",
 ): string {
+  if (pastDate == null) return "Invalid Date";
   const intlCode = localeToIntlCode(locale);
   const now = new Date();
   const date =
-    typeof pastDate === "number" ? new Date(pastDate * 1000) : pastDate;
+    typeof pastDate === "number" ? new Date(pastDate * 1000) : new Date(pastDate as any);
+  if (isNaN(date.getTime())) return "Invalid Date";
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   const rtf = new Intl.RelativeTimeFormat(intlCode, { numeric: "auto" });

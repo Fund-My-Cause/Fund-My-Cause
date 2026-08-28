@@ -184,7 +184,7 @@ pub const TTL_INSTANCE_EXTEND_MIN: u32 = 17280;
 /// TTL extension value for instance storage (long-term, in ledger entries).
 /// Used to ensure campaign data survives well beyond typical campaign lifetime.
 /// Value represents ~6 days of Soroban ledger entries (~518,400 entries).
-pub const TTL_INSTANCE_EXTEND_MAX: u32 = 518400;
+pub const TTL_INSTANCE_EXTEND_MAX: u32 = 518_400;
 
 /// Maximum batch size for refund operations.
 /// Limits the number of contributors processed in a single `refund_batch` call

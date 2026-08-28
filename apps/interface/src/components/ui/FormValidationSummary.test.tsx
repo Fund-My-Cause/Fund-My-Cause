@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { FormValidationSummary } from "../FormValidationSummary";
+import { FormValidationSummary } from "./FormValidationSummary";
 
 describe("FormValidationSummary", () => {
   it("renders nothing when errors is empty", () => {

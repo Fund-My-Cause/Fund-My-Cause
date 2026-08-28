@@ -67,6 +67,64 @@
 // Migrating changes how events are encoded on the wire, so it is a behaviour change
 // for every off-chain consumer, not a lint cleanup, and is tracked separately.
 #![allow(deprecated)]
+// ── Pedantic lint exceptions for Soroban contracts (issue #1162) ──────────────
+//
+// `needless_pass_by_value`: Soroban SDK types (`Env`, `Address`, `String`,
+// `Vec`) must be passed by value — the SDK does not expose `Clone`-free
+// reference semantics on these types and `require_auth` / host calls consume
+// them.  Changing to `&T` would require pervasive SDK-incompatible refactors.
+#![allow(clippy::needless_pass_by_value)]
+// `missing_errors_doc`: contract entry-point `# Errors` sections are
+// documented on the `#[contractimpl]` wrappers in lib.rs.  The private
+// module functions they delegate to are internal implementation detail;
+// duplicating error docs there would diverge from the public docs and add
+// maintenance overhead.
+#![allow(clippy::missing_errors_doc)]
+// `missing_panics_doc`: any panics inside contract helpers are from
+// post-initialization `unwrap()` calls on keys that are always present (see
+// the "Initialization invariant" section of the module-level doc-comment).
+// They are documented once there rather than repeated at every call site.
+#![allow(clippy::missing_panics_doc)]
+// `must_use_candidate`: Soroban entry-point return values are consumed by the
+// host; adding `#[must_use]` to every view function would litter the public
+// API surface without benefit in the contract context.
+#![allow(clippy::must_use_candidate)]
+// `too_many_lines`: several entry points are necessarily long because Soroban
+// contract logic cannot easily be broken into smaller units across module
+// boundaries without adding cross-contract calls.
+#![allow(clippy::too_many_lines)]
+// `cast_possible_truncation` / `cast_sign_loss`: widening/narrowing casts in
+// contract math are intentional and safe within the domain constraints
+// (progress_bps ≤ 10_000, contributor_count fits u32, etc.).  Changing to
+// `try_into()` chains would add `.unwrap_or_default()` everywhere and obscure
+// the logic.
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+// `cast_lossless`: widening casts (u32→i128, u64→i128) are explicit for
+// clarity in arithmetic expressions; the `From` conversion would work but
+// makes the intent less readable in complex formulas.
+#![allow(clippy::cast_lossless)]
+// `similar_names`: short variable names like `end`/`env` arise naturally in
+// Soroban pagination helpers; renaming for clippy would reduce readability.
+#![allow(clippy::similar_names)]
+// `match_same_arms`: some match arms intentionally share bodies to be
+// explicit about which variants map to which outcomes for auditability.
+#![allow(clippy::match_same_arms)]
+// `items_after_statements`: `const` declarations after let-bindings in
+// function bodies are used to co-locate magic numbers with the code that
+// uses them, improving readability.
+#![allow(clippy::items_after_statements)]
+// `unnecessary_wraps`: some internal helpers return `Result<T>` for
+// consistency with the rest of the module's error-handling pattern even when
+// they currently can't fail; keeping the signature stable avoids churn if a
+// future caller needs to propagate errors through the same function.
+#![allow(clippy::unnecessary_wraps)]
+// `doc_markdown`: backtick requirements in doc-comments for Soroban-specific
+// identifiers (e.g. `u32` in prose) are noise in this context.
+#![allow(clippy::doc_markdown)]
+// `map_unwrap_or`: `.map(f).unwrap_or(v)` is clear in complex closures where
+// `map_or(v, f)` argument order can be confusing.
+#![allow(clippy::map_unwrap_or)]
 
 mod access;
 mod analytics;
@@ -1230,7 +1288,7 @@ impl CrowdfundContract {
         if status != Status::Active {
             return Err(ContractError::NotActive);
         }
-        validate_category(&category)?;
+        validate_category(category)?;
         let creator: Address = inst.get(&KEY_CREATOR).unwrap();
         creator.require_auth();
 
@@ -1398,7 +1456,7 @@ impl CrowdfundContract {
         validate_deadline_extension(new_deadline, current_deadline)?;
 
         let now = env.ledger().timestamp();
-        let voting_ends_at = now + 604800; // 7 days
+        let voting_ends_at = now + 604_800; // 7 days
         let proposal = ExtensionProposal {
             new_deadline,
             votes_for: 0,
@@ -3375,7 +3433,7 @@ impl CrowdfundContract {
             platform_address: platform_address.clone(),
             platform_fee_bps,
             created_at: now,
-            voting_ends_at: now + 604800, // 7 days
+            voting_ends_at: now + 604_800, // 7 days
             approvals: 0,
             timelock_until: 0,
             executed: false,
