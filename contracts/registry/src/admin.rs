@@ -12,7 +12,7 @@
 //! organizing principle for this module vs. [`crate::lookup`] (read-only,
 //! no auth, no writes).
 
-use common::{AccessControl, EVENT_SCHEMA_VERSION};
+use common::{EVENT_SCHEMA_VERSION};
 use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
@@ -161,12 +161,11 @@ pub(crate) fn update_status(
 ) -> Result<(), ContractError> {
     require_initialized(&env)?;
 
-    let admin: Address = env
-        .storage()
-        .instance()
-        .get(&KEY_ADMIN)
-        .ok_or(ContractError::NotInitialized)?;
-    AccessControl::require_role_auth(&admin);
+    // Issue #1147: use the shared AccessControl helper instead of the previously
+    // inline "read KEY_ADMIN → require_role_auth" pattern. Behaviour is identical:
+    // loads the stored admin address and calls require_auth() on it.
+    common::AccessControl::require_stored_auth(&env, &KEY_ADMIN)
+        .map_err(|_| ContractError::Unauthorized)?;
 
     // Guard: campaign must already be registered globally
     let campaigns: Vec<Address> = env
