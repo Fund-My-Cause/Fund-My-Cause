@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, FileText, FileJson, FileSpreadsheet } from "lucide-react";
+import { FileText, FileJson, FileSpreadsheet } from "lucide-react";
 import { CampaignData } from "@/types/soroban";
 
 interface AnalyticsExportProps {
@@ -14,7 +14,8 @@ export function AnalyticsExport({ campaigns }: AnalyticsExportProps) {
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
 
   const exportCsv = () => {
-    const header = "Title,Status,Raised (XLM),Goal (XLM),Deadline,Contract ID,Contributors,Avg Contribution";
+    const header =
+      "Title,Status,Raised (XLM),Goal (XLM),Deadline,Contract ID,Contributors,Avg Contribution";
     const rows = campaigns.map((c) =>
       [
         `"${c.title.replace(/"/g, '""')}"`,
@@ -25,7 +26,7 @@ export function AnalyticsExport({ campaigns }: AnalyticsExportProps) {
         c.contractId,
         c.contributorCount,
         c.averageContribution.toFixed(2),
-      ].join(",")
+      ].join(","),
     );
     const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
     downloadBlob(blob, "campaigns-analytics.csv");
@@ -46,16 +47,21 @@ export function AnalyticsExport({ campaigns }: AnalyticsExportProps) {
         averageContribution: c.averageContribution,
       })),
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     downloadBlob(blob, "campaigns-analytics.json");
   };
 
   const exportPdf = () => {
     // Simple text-based PDF export (for a real implementation, use a library like jsPDF)
-    const content = campaigns.map((c) => 
-      `${c.title}\nStatus: ${c.status}\nRaised: ${c.raised.toFixed(2)} XLM\nGoal: ${c.goal.toFixed(2)} XLM\nContributors: ${c.contributorCount}\n\n`
-    ).join("");
-    
+    const content = campaigns
+      .map(
+        (c) =>
+          `${c.title}\nStatus: ${c.status}\nRaised: ${c.raised.toFixed(2)} XLM\nGoal: ${c.goal.toFixed(2)} XLM\nContributors: ${c.contributorCount}\n\n`,
+      )
+      .join("");
+
     const blob = new Blob([content], { type: "text/plain" });
     downloadBlob(blob, "campaigns-analytics.txt");
   };

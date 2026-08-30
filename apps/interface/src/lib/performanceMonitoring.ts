@@ -21,19 +21,29 @@ export interface PerformanceCallback {
   (metrics: PerformanceMetrics): void;
 }
 
+// Type extensions for PerformanceObserver entries
+interface LayoutShiftEntry extends PerformanceEntry {
+  hadRecentInput: boolean;
+  value: number;
+}
+
+interface FirstInputEntry extends PerformanceEntry {
+  processingDuration: number;
+}
+
 /**
  * Measure Core Web Vitals
  */
-export function measureCoreWebVitals(
-  callback: PerformanceCallback
-): void {
+export function measureCoreWebVitals(callback: PerformanceCallback): void {
   if (typeof window === "undefined" || !performance?.getEntriesByType) return;
 
   const metrics: PerformanceMetrics = {};
 
   // First Contentful Paint
   const paintEntries = performance.getEntriesByType("paint");
-  const fcp = paintEntries.find((entry) => entry.name === "first-contentful-paint");
+  const fcp = paintEntries.find(
+    (entry) => entry.name === "first-contentful-paint",
+  );
   if (fcp) metrics.fcp = fcp.startTime;
 
   // Largest Contentful Paint
@@ -45,7 +55,7 @@ export function measureCoreWebVitals(
 
   try {
     observer.observe({ entryTypes: ["largest-contentful-paint"] });
-  } catch (e) {
+  } catch (_e) {
     console.warn("LCP observer not supported");
   }
 
@@ -53,8 +63,9 @@ export function measureCoreWebVitals(
   let clsValue = 0;
   const clsObserver = new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
-      if (!(entry as any).hadRecentInput) {
-        clsValue += (entry as any).value;
+      const shiftEntry = entry as LayoutShiftEntry;
+      if (!shiftEntry.hadRecentInput) {
+        clsValue += shiftEntry.value;
         metrics.cls = clsValue;
       }
     }
@@ -62,7 +73,7 @@ export function measureCoreWebVitals(
 
   try {
     clsObserver.observe({ entryTypes: ["layout-shift"] });
-  } catch (e) {
+  } catch (_e) {
     console.warn("CLS observer not supported");
   }
 
@@ -70,20 +81,22 @@ export function measureCoreWebVitals(
   const fidObserver = new PerformanceObserver((list) => {
     const entries = list.getEntries();
     if (entries.length > 0) {
-      metrics.fid = (entries[0] as any).processingDuration;
+      const inputEntry = entries[0] as FirstInputEntry;
+      metrics.fid = inputEntry.processingDuration;
     }
   });
 
   try {
     fidObserver.observe({ entryTypes: ["first-input"] });
-  } catch (e) {
+  } catch (_e) {
     console.warn("FID observer not supported");
   }
 
   // Time to First Byte
   const navigationTiming = performance.getEntriesByType("navigation")[0];
   if (navigationTiming) {
-    metrics.ttfb = (navigationTiming as PerformanceNavigationTiming).responseStart -
+    metrics.ttfb =
+      (navigationTiming as PerformanceNavigationTiming).responseStart -
       (navigationTiming as PerformanceNavigationTiming).requestStart;
     metrics.navigationTiming = navigationTiming as PerformanceNavigationTiming;
   }
@@ -100,16 +113,20 @@ export function getCoreWebVitals(): CoreWebVitals {
   }
 
   const paintEntries = performance.getEntriesByType("paint");
-  const fcp = paintEntries.find((entry) => entry.name === "first-contentful-paint");
+  const _fcp = paintEntries.find(
+    (entry) => entry.name === "first-contentful-paint",
+  );
 
   const lcpEntries = performance.getEntriesByType("largest-contentful-paint");
-  const lcp = lcpEntries.length > 0 ? lcpEntries[lcpEntries.length - 1].startTime : null;
+  const lcp =
+    lcpEntries.length > 0 ? lcpEntries[lcpEntries.length - 1].startTime : null;
 
   const clsEntries = performance.getEntriesByType("layout-shift");
   let cls = 0;
   for (const entry of clsEntries) {
-    if (!(entry as any).hadRecentInput) {
-      cls += (entry as any).value;
+    const shiftEntry = entry as LayoutShiftEntry;
+    if (!shiftEntry.hadRecentInput) {
+      cls += shiftEntry.value;
     }
   }
 
@@ -126,7 +143,9 @@ export function getCoreWebVitals(): CoreWebVitals {
 export function measurePageLoadTime(): number {
   if (typeof window === "undefined" || !performance?.getEntriesByType) return 0;
 
-  const navigationTiming = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
+  const navigationTiming = performance.getEntriesByType(
+    "navigation",
+  )[0] as PerformanceNavigationTiming;
   if (!navigationTiming) return 0;
 
   return navigationTiming.loadEventEnd - navigationTiming.fetchStart;
@@ -136,8 +155,11 @@ export function measurePageLoadTime(): number {
  * Measure resource timing
  */
 export function getResourceTimings(): PerformanceResourceTiming[] {
-  if (typeof window === "undefined" || !performance?.getEntriesByType) return [];
-  return performance.getEntriesByType("resource") as PerformanceResourceTiming[];
+  if (typeof window === "undefined" || !performance?.getEntriesByType)
+    return [];
+  return performance.getEntriesByType(
+    "resource",
+  ) as PerformanceResourceTiming[];
 }
 
 /**
@@ -145,7 +167,7 @@ export function getResourceTimings(): PerformanceResourceTiming[] {
  */
 export async function reportPerformanceMetrics(
   endpoint: string,
-  metrics: PerformanceMetrics
+  metrics: PerformanceMetrics,
 ): Promise<void> {
   if (typeof window === "undefined") return;
 
@@ -176,7 +198,7 @@ export function markPerformance(name: string): void {
 export function measurePerformance(
   name: string,
   startMark: string,
-  endMark: string
+  endMark: string,
 ): number {
   if (typeof window === "undefined") return 0;
   if (typeof performance?.measure !== "function") return 0;

@@ -165,7 +165,7 @@ export function PledgeModal({
     address && !accountLoading && !accountExists,
   );
   const showMinimumNote = minContribution > XLM_TO_STROOPS;
-  const amountDescribedBy =
+  const _amountDescribedBy =
     [
       showUnfundedWarning ? unfundedWarningId : null,
       showMinimumNote ? minimumNoteId : null,

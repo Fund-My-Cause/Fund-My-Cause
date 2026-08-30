@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Search, Plus, Check, ChevronDown } from "lucide-react";
+import { Search, Plus, ChevronDown } from "lucide-react";
 import { ALL_CAMPAIGNS } from "@/lib/campaigns";
 import { useComparison } from "@/context/ComparisonContext";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,10 @@ export function CampaignSelector() {
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
@@ -60,10 +63,7 @@ export function CampaignSelector() {
         Add Campaign
         <ChevronDown
           size={14}
-          className={cn(
-            "transition-transform",
-            isOpen && "rotate-180",
-          )}
+          className={cn("transition-transform", isOpen && "rotate-180")}
         />
       </button>
 

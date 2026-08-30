@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { X, ChevronRight, ChevronLeft } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
@@ -15,7 +15,8 @@ const TOUR_STEPS: TourStep[] = [
   {
     target: "[data-tour='connect-wallet']",
     title: "Connect your wallet",
-    content: "Click here to connect Freighter or LOBSTR and start interacting with campaigns.",
+    content:
+      "Click here to connect Freighter or LOBSTR and start interacting with campaigns.",
     placement: "bottom",
   },
   {
@@ -33,7 +34,8 @@ const TOUR_STEPS: TourStep[] = [
   {
     target: "[data-tour='contribute']",
     title: "Contribute",
-    content: "Pledge XLM to campaigns you believe in. Refunds are automatic if the goal isn't met.",
+    content:
+      "Pledge XLM to campaigns you believe in. Refunds are automatic if the goal isn't met.",
     placement: "top",
   },
 ];
@@ -54,14 +56,30 @@ function getTooltipStyle(
   const { top, left, width, height } = targetRect;
   switch (placement) {
     case "top":
-      return { bottom: `calc(100vh - ${top - PADDING}px)`, left: left + width / 2, transform: "translateX(-50%)" };
+      return {
+        bottom: `calc(100vh - ${top - PADDING}px)`,
+        left: left + width / 2,
+        transform: "translateX(-50%)",
+      };
     case "left":
-      return { top: top + height / 2, right: `calc(100vw - ${left - PADDING}px)`, transform: "translateY(-50%)" };
+      return {
+        top: top + height / 2,
+        right: `calc(100vw - ${left - PADDING}px)`,
+        transform: "translateY(-50%)",
+      };
     case "right":
-      return { top: top + height / 2, left: left + width + PADDING, transform: "translateY(-50%)" };
+      return {
+        top: top + height / 2,
+        left: left + width + PADDING,
+        transform: "translateY(-50%)",
+      };
     case "bottom":
     default:
-      return { top: top + height + PADDING, left: left + width / 2, transform: "translateX(-50%)" };
+      return {
+        top: top + height + PADDING,
+        left: left + width / 2,
+        transform: "translateX(-50%)",
+      };
   }
 }
 
@@ -93,8 +111,16 @@ export function ProductTour({ onReplayRef }: ProductTourProps) {
       return;
     }
     const rect = el.getBoundingClientRect();
-    setTargetRect({ top: rect.top, left: rect.left, width: rect.width, height: rect.height });
-    el.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "nearest" });
+    setTargetRect({
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+    });
+    el.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "nearest",
+    });
   }, [currentStep, prefersReducedMotion]);
 
   useEffect(() => {
@@ -223,7 +249,9 @@ export function ProductTour({ onReplayRef }: ProductTourProps) {
 
           <button
             onClick={next}
-            aria-label={step + 1 === TOUR_STEPS.length ? "Finish tour" : "Next step"}
+            aria-label={
+              step + 1 === TOUR_STEPS.length ? "Finish tour" : "Next step"
+            }
             className="flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 transition"
           >
             {step + 1 === TOUR_STEPS.length ? "Finish" : "Next"}

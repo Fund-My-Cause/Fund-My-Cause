@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { X, Keyboard } from "lucide-react";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 export interface ShortcutEntry {
-  keys: string[];       // e.g. ["Ctrl", "K"] or ["?"]
+  keys: string[]; // e.g. ["Ctrl", "K"] or ["?"]
   description: string;
   category: string;
 }
@@ -25,7 +25,11 @@ export const GLOBAL_SHORTCUTS: ShortcutEntry[] = [
   { keys: ["G", "B"], description: "Go to Bookmarks", category: "Navigation" },
   { keys: ["G", "A"], description: "Go to Analytics", category: "Navigation" },
   // Actions
-  { keys: ["Ctrl", "K"], description: "Open command palette", category: "Actions" },
+  {
+    keys: ["Ctrl", "K"],
+    description: "Open command palette",
+    category: "Actions",
+  },
   { keys: ["?"], description: "Show keyboard shortcuts", category: "Actions" },
   { keys: ["N"], description: "Create new campaign", category: "Actions" },
   { keys: ["Esc"], description: "Close overlay / modal", category: "Actions" },
@@ -34,9 +38,21 @@ export const GLOBAL_SHORTCUTS: ShortcutEntry[] = [
   { keys: ["S"], description: "Share campaign", category: "Campaign" },
   { keys: ["B"], description: "Bookmark / unbookmark", category: "Campaign" },
   // Accessibility
-  { keys: ["Tab"], description: "Move focus forward", category: "Accessibility" },
-  { keys: ["Shift", "Tab"], description: "Move focus backward", category: "Accessibility" },
-  { keys: ["Enter", "Space"], description: "Activate focused element", category: "Accessibility" },
+  {
+    keys: ["Tab"],
+    description: "Move focus forward",
+    category: "Accessibility",
+  },
+  {
+    keys: ["Shift", "Tab"],
+    description: "Move focus backward",
+    category: "Accessibility",
+  },
+  {
+    keys: ["Enter", "Space"],
+    description: "Activate focused element",
+    category: "Accessibility",
+  },
 ];
 
 function Kbd({ children }: { children: React.ReactNode }) {
@@ -55,11 +71,14 @@ export function KeyboardShortcutsOverlay({
   const trapRef = useFocusTrap(isOpen);
 
   // Group shortcuts by category
-  const grouped = shortcuts.reduce<Record<string, ShortcutEntry[]>>((acc, s) => {
-    if (!acc[s.category]) acc[s.category] = [];
-    acc[s.category].push(s);
-    return acc;
-  }, {});
+  const grouped = shortcuts.reduce<Record<string, ShortcutEntry[]>>(
+    (acc, s) => {
+      if (!acc[s.category]) acc[s.category] = [];
+      acc[s.category].push(s);
+      return acc;
+    },
+    {},
+  );
 
   // Close on Escape
   useEffect(() => {
@@ -78,7 +97,9 @@ export function KeyboardShortcutsOverlay({
     } else {
       document.body.style.overflow = "";
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -125,7 +146,10 @@ export function KeyboardShortcutsOverlay({
         {/* Body — scrollable */}
         <div className="overflow-y-auto p-6 space-y-6">
           {Object.entries(grouped).map(([category, items]) => (
-            <section key={category} aria-labelledby={`shortcut-cat-${category}`}>
+            <section
+              key={category}
+              aria-labelledby={`shortcut-cat-${category}`}
+            >
               <h3
                 id={`shortcut-cat-${category}`}
                 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3"
@@ -141,11 +165,16 @@ export function KeyboardShortcutsOverlay({
                     <span className="text-sm text-gray-700 dark:text-gray-300">
                       {s.description}
                     </span>
-                    <span className="flex items-center gap-1 shrink-0" aria-label={s.keys.join(" + ")}>
+                    <span
+                      className="flex items-center gap-1 shrink-0"
+                      aria-label={s.keys.join(" + ")}
+                    >
                       {s.keys.map((k, i) => (
                         <React.Fragment key={k}>
                           {i > 0 && (
-                            <span className="text-gray-400 text-xs" aria-hidden>+</span>
+                            <span className="text-gray-400 text-xs" aria-hidden>
+                              +
+                            </span>
                           )}
                           <Kbd>{k}</Kbd>
                         </React.Fragment>
@@ -161,11 +190,8 @@ export function KeyboardShortcutsOverlay({
         {/* Footer */}
         <div className="shrink-0 px-6 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/80">
           <p className="text-xs text-gray-400 text-center">
-            Press{" "}
-            <Kbd>?</Kbd>
-            {" "}at any time to open this overlay ·{" "}
-            <Kbd>Esc</Kbd>
-            {" "}to close
+            Press <Kbd>?</Kbd> at any time to open this overlay · <Kbd>Esc</Kbd>{" "}
+            to close
           </p>
         </div>
       </div>

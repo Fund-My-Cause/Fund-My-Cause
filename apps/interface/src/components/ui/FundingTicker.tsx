@@ -11,13 +11,7 @@
  *   separate visually-hidden live region that announces new items politely
  */
 
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-  useReducer,
-} from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Pause, Play, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { getCampaignSlug } from "@/lib/slugs";
@@ -189,12 +183,19 @@ export function FundingTicker({
           <span className="flex items-center gap-1 text-xs font-semibold text-indigo-400 shrink-0">
             <TrendingUp size={13} aria-hidden /> Live
           </span>
-          <ul className="flex flex-wrap gap-x-6 gap-y-1" aria-label="Recent contributions list">
+          <ul
+            className="flex flex-wrap gap-x-6 gap-y-1"
+            aria-label="Recent contributions list"
+          >
             {items.slice(0, 5).map((item) => (
               <li key={item.id} className="text-xs text-gray-300">
-                <span className="font-mono text-gray-500">{item.contributorLabel}</span>
+                <span className="font-mono text-gray-500">
+                  {item.contributorLabel}
+                </span>
                 {" pledged "}
-                <span className="font-semibold text-indigo-400">{formatXlm(item.amountXlm)}</span>
+                <span className="font-semibold text-indigo-400">
+                  {formatXlm(item.amountXlm)}
+                </span>
                 {" → "}
                 <Link
                   href={`/campaigns/${getCampaignSlug(item.campaignId)}`}
@@ -245,7 +246,11 @@ export function FundingTicker({
             aria-pressed={paused}
             className="p-1 rounded text-gray-500 hover:text-gray-300 transition"
           >
-            {paused ? <Play size={12} aria-hidden /> : <Pause size={12} aria-hidden />}
+            {paused ? (
+              <Play size={12} aria-hidden />
+            ) : (
+              <Pause size={12} aria-hidden />
+            )}
           </button>
         </div>
 
@@ -273,11 +278,15 @@ export function FundingTicker({
                 <span className="font-mono text-gray-500 shrink-0">
                   {item.contributorLabel}
                 </span>
-                <span className="text-gray-600" aria-hidden>pledged</span>
+                <span className="text-gray-600" aria-hidden>
+                  pledged
+                </span>
                 <span className="font-semibold text-indigo-400">
                   {formatXlm(item.amountXlm)}
                 </span>
-                <span className="text-gray-600" aria-hidden>→</span>
+                <span className="text-gray-600" aria-hidden>
+                  →
+                </span>
                 <Link
                   href={`/campaigns/${getCampaignSlug(item.campaignId)}`}
                   className="text-gray-200 hover:text-indigo-300 transition underline-offset-2 hover:underline"
@@ -289,7 +298,9 @@ export function FundingTicker({
                 <span className="text-gray-700 text-[10px] tabular-nums ml-1">
                   {timeAgo(item.timestamp)}
                 </span>
-                <span className="text-gray-700 mx-2 select-none" aria-hidden>·</span>
+                <span className="text-gray-700 mx-2 select-none" aria-hidden>
+                  ·
+                </span>
               </span>
             ))}
           </div>

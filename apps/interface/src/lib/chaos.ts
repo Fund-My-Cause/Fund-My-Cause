@@ -17,7 +17,10 @@ export interface ChaosConfig {
   websocket?: FailureConfig;
 }
 
-export function injectChaos(target: keyof ChaosConfig, config: FailureConfig): void {
+export function injectChaos(
+  target: keyof ChaosConfig,
+  config: FailureConfig,
+): void {
   activeFailure = { ...config, _target: target };
   failureCount++;
 }
@@ -26,12 +29,21 @@ export function clearChaos(): void {
   activeFailure = null;
 }
 
-export function getActiveFailure(): FailureConfig & { _target?: string } | null {
+export function getActiveFailure():
+  | (FailureConfig & { _target?: string })
+  | null {
   return activeFailure;
 }
 
-export function shouldFail(target: string): { shouldFail: boolean; config: FailureConfig | null } {
-  if (activeFailure && (activeFailure as any)._target === target) {
+export function shouldFail(target: string): {
+  shouldFail: boolean;
+  config: FailureConfig | null;
+} {
+  if (
+    activeFailure &&
+    "_target" in activeFailure &&
+    activeFailure._target === target
+  ) {
     if (Math.random() < activeFailure.probability) {
       return { shouldFail: true, config: activeFailure };
     }

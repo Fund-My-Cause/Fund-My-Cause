@@ -13,13 +13,17 @@ interface LeaderboardProps {
   userAddress?: string;
   timeframe?: "all-time" | "this-month" | "this-week";
   type?: "points" | "contributions" | "achievements" | "referrals";
-  onTimeframeChange?: (timeframe: "all-time" | "this-month" | "this-week") => void;
-  onTypeChange?: (type: "points" | "contributions" | "achievements" | "referrals") => void;
+  onTimeframeChange?: (
+    timeframe: "all-time" | "this-month" | "this-week",
+  ) => void;
+  onTypeChange?: (
+    type: "points" | "contributions" | "achievements" | "referrals",
+  ) => void;
   loading?: boolean;
   totalPages?: number;
   currentPage?: number;
   onPageChange?: (page: number) => void;
-  pageSize?: number;
+  _pageSize?: number;
 }
 
 export function Leaderboard({
@@ -33,7 +37,7 @@ export function Leaderboard({
   totalPages = 1,
   currentPage = 0,
   onPageChange,
-  pageSize = 10,
+  _pageSize = 10,
 }: LeaderboardProps) {
   const [showAddresses, setShowAddresses] = useState(false);
 
@@ -69,9 +73,7 @@ export function Leaderboard({
           <div>
             <h2 className="text-2xl font-bold">{typeLabels[type]}</h2>
             {userRank && (
-              <p className="text-sm opacity-90">
-                Your rank: #{userRank} 🎯
-              </p>
+              <p className="text-sm opacity-90">Your rank: #{userRank} 🎯</p>
             )}
           </div>
         </div>

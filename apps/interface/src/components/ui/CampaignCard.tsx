@@ -16,7 +16,6 @@ import { CountdownTimer } from "@/components/ui/CountdownTimer";
 import type { Campaign } from "@/types/campaign";
 import { useComparison } from "@/context/ComparisonContext";
 import { useBookmarks } from "@/context/BookmarkContext";
-import { getCategoryBySlug } from "@/lib/categories";
 import { getFallbackImage, isValidImageUri } from "@/lib/imageValidation";
 import { SIZES_CARD_THUMB } from "@/lib/imageOptimization";
 import {

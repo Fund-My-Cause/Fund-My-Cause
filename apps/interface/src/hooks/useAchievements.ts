@@ -108,7 +108,7 @@ const ACHIEVEMENT_DEFINITIONS = {
  * Fetch user achievements
  */
 async function fetchUserAchievements(
-  userAddress: string
+  _userAddress: string,
 ): Promise<Achievement[]> {
   // Mocked pending Issue #12 (achievements contract: unlock conditions are
   // still TODO'd on-chain). Replace with a real contract/API read once #12 lands.
@@ -143,7 +143,7 @@ async function fetchUserAchievements(
  * Fetch user achievement progress
  */
 async function fetchAchievementProgress(
-  userAddress: string
+  _userAddress: string,
 ): Promise<AchievementProgress[]> {
   // Mocked pending Issue #12 (achievements contract: stub leaderboard ranking,
   // unlock conditions unresolved). Replace with a real contract/API read once #12 lands.
@@ -187,7 +187,7 @@ async function fetchAchievementProgress(
  * Fetch user gamification profile
  */
 async function fetchGamificationProfile(
-  userAddress: string
+  userAddress: string,
 ): Promise<GamificationProfile> {
   // Mocked pending Issue #12 (achievements contract not yet finished).
   // Replace with a real contract/API read once #12 lands.
@@ -224,9 +224,7 @@ export function useAchievements({
   } = useQuery<Achievement[]>({
     queryKey: QUERY_KEYS.achievements(userAddress ?? ""),
     queryFn: () =>
-      userAddress
-        ? fetchUserAchievements(userAddress)
-        : Promise.resolve([]),
+      userAddress ? fetchUserAchievements(userAddress) : Promise.resolve([]),
     enabled: enabled && !!userAddress,
   });
 
@@ -238,9 +236,7 @@ export function useAchievements({
   } = useQuery<AchievementProgress[]>({
     queryKey: QUERY_KEYS.achievementProgress(userAddress ?? ""),
     queryFn: () =>
-      userAddress
-        ? fetchAchievementProgress(userAddress)
-        : Promise.resolve([]),
+      userAddress ? fetchAchievementProgress(userAddress) : Promise.resolve([]),
     enabled: enabled && !!userAddress,
   });
 
@@ -249,12 +245,12 @@ export function useAchievements({
     data: profile,
     isLoading: profileLoading,
     error: profileError,
-  } = useQuery<GamificationProfile>({
+  } = useQuery<GamificationProfile | undefined>({
     queryKey: QUERY_KEYS.gamificationProfile(userAddress ?? ""),
     queryFn: () =>
       userAddress
         ? fetchGamificationProfile(userAddress)
-        : Promise.resolve(null as any),
+        : Promise.resolve(undefined),
     enabled: enabled && !!userAddress,
   });
 
@@ -299,11 +295,11 @@ export function useAchievements({
   // Mutation to share achievement
   const shareAchievementMutation = useMutation({
     mutationFn: async ({
-      achievementId,
-      platform,
+      _achievementId,
+      _platform,
     }: {
-      achievementId: string;
-      platform: string;
+      _achievementId: string;
+      _platform: string;
     }): Promise<void> => {
       // Mocked pending Issue #12 (no share-tracking entrypoint on the
       // achievements contract yet). Replace with a real API/contract call once #12 lands.
@@ -321,9 +317,7 @@ export function useAchievements({
       unlocked,
       completion,
       nextMilestone:
-        unlocked % 5 === 0
-          ? unlocked + 5
-          : Math.ceil(unlocked / 5) * 5,
+        unlocked % 5 === 0 ? unlocked + 5 : Math.ceil(unlocked / 5) * 5,
     };
   }, [achievements]);
 
@@ -351,16 +345,16 @@ export function useAchievements({
       (type: AchievementType) => {
         return unlockAchievementMutation.mutate({ achievementType: type });
       },
-      [unlockAchievementMutation]
+      [unlockAchievementMutation],
     ),
     shareAchievement: useCallback(
       (id: string, platform: string) => {
         return shareAchievementMutation.mutate({
-          achievementId: id,
-          platform,
+          _achievementId: id,
+          _platform: platform,
         });
       },
-      [shareAchievementMutation]
+      [shareAchievementMutation],
     ),
 
     // Mutations
