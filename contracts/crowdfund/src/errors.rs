@@ -151,4 +151,32 @@ pub enum ContractError {
     InvalidInitParams = 68,
     /// The withdrawal has already been executed (campaign already paid out)
     AlreadyWithdrawn = 69,
+    /// A required address could not be read from storage (contract not initialized)
+    InvalidAddress = 70,
+    /// There is nothing available to refund for this caller
+    NothingToRefund = 71,
+    /// The campaign is not currently paused
+    NotPaused = 72,
+}
+
+impl From<common::CommonError> for ContractError {
+    /// Folds the shared [`common::CommonError`] variants into this contract's
+    /// error space, preserving stable on-chain discriminants.
+    ///
+    /// | `CommonError` variant   | Maps to                           |
+    /// |-------------------------|-----------------------------------|
+    /// | `Unauthorized`          | `ContractError::Unauthorized` (33) |
+    /// | `NotFound`              | `ContractError::NotFound` (59)     |
+    /// | `AlreadyInitialized`    | `ContractError::AlreadyInitialized` (1) |
+    /// | `AlreadyExists`         | `ContractError::InvalidGoal` (12) — closest generic |
+    /// | `InvalidInput`          | `ContractError::InvalidInput` (58) |
+    fn from(err: common::CommonError) -> Self {
+        match err {
+            common::CommonError::Unauthorized => ContractError::Unauthorized,
+            common::CommonError::NotFound => ContractError::NotFound,
+            common::CommonError::AlreadyInitialized => ContractError::AlreadyInitialized,
+            common::CommonError::AlreadyExists => ContractError::InvalidGoal,
+            common::CommonError::InvalidInput => ContractError::InvalidInput,
+        }
+    }
 }

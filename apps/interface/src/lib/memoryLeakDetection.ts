@@ -3,6 +3,10 @@
  * Tracks object allocations and detects potential leaks.
  */
 
+import { logger } from "@/lib/logger";
+
+const memLogger = logger.child("memory-profiling");
+
 interface AllocationRecord {
   type: string;
   size: number;
@@ -13,6 +17,16 @@ interface AllocationRecord {
 const allocations = new Map<string, AllocationRecord[]>();
 let isMonitoring = false;
 
+interface PerformanceMemory {
+  jsHeapSizeLimit: number;
+  totalJSHeapSize: number;
+  usedJSHeapSize: number;
+}
+
+function getPerformanceMemory(): PerformanceMemory | undefined {
+  return (performance as unknown as { memory?: PerformanceMemory }).memory;
+}
+
 /**
  * Start memory profiling.
  */
@@ -20,8 +34,8 @@ export function startMemoryProfiling(): void {
   if (isMonitoring) return;
   isMonitoring = true;
 
-  if (performance.memory) {
-    console.log("Memory profiling started");
+  if (getPerformanceMemory()) {
+    memLogger.debug("profiling started");
   }
 }
 
@@ -58,9 +72,17 @@ export function trackAllocation(
  * Get memory stats.
  */
 export function getMemoryStats() {
-  const stats = {
+  const stats: {
+    totalAllocations: number;
+    allocationsByType: Record<string, number>;
+    totalSize: number;
+    timestamp: number;
+    jsHeapSizeLimit?: number;
+    totalJSHeapSize?: number;
+    usedJSHeapSize?: number;
+  } = {
     totalAllocations: 0,
-    allocationsByType: {} as Record<string, number>,
+    allocationsByType: {},
     totalSize: 0,
     timestamp: Date.now(),
   };
@@ -71,10 +93,11 @@ export function getMemoryStats() {
     stats.totalSize += records.reduce((sum, r) => sum + r.size, 0);
   }
 
-  if (performance.memory) {
-    stats.jsHeapSizeLimit = performance.memory.jsHeapSizeLimit;
-    stats.totalJSHeapSize = performance.memory.totalJSHeapSize;
-    stats.usedJSHeapSize = performance.memory.usedJSHeapSize;
+  const perfMem = getPerformanceMemory();
+  if (perfMem) {
+    stats.jsHeapSizeLimit = perfMem.jsHeapSizeLimit;
+    stats.totalJSHeapSize = perfMem.totalJSHeapSize;
+    stats.usedJSHeapSize = perfMem.usedJSHeapSize;
   }
 
   return stats;

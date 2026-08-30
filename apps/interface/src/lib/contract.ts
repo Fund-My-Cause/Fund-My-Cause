@@ -13,6 +13,7 @@ import {
   scValToNative,
   rpc as SorobanRpc,
   Horizon,
+  xdr,
 } from "@stellar/stellar-sdk";
 import {
   CONTRACT_ID,
@@ -23,7 +24,14 @@ import {
 import { isValidContractId } from "@/lib/validation";
 import type { SignFn } from "@/types/contract";
 import { ContractError } from "@/types/contract";
-import { cacheGet, cacheSet, cacheInvalidateLive, rpcSuccess, rpcFailure } from "@/lib/rpc-cache";
+import type { CampaignInfo, CampaignStats } from "@fund-my-cause/types";
+import {
+  cacheGet,
+  cacheSet,
+  cacheInvalidateLive,
+  rpcSuccess,
+  rpcFailure,
+} from "@/lib/rpc-cache";
 
 // Re-export types for backward compatibility
 export type { SignFn } from "@/types/contract";
@@ -45,15 +53,14 @@ export function getContractClient(rpcUrl: string = RPC_URL): SorobanRpc.Server {
  * Uses a dummy account — no signing required.
  * @param {string} contractId - The Soroban contract address
  * @param {string} method - Contract method name to call
- * @param {any[]} [args=[]] - Method arguments
+ * @param {unknown[]} [args=[]] - Method arguments
  * @returns {Promise<unknown>} Decoded return value from the contract
  * @throws {ContractError} If simulation fails
  */
 async function simulateView(
   contractId: string,
   method: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  args: any[] = [],
+  args: xdr.ScVal[] = [],
 ): Promise<unknown> {
   if (!isValidContractId(contractId)) {
     throw new ContractError(`Invalid contract ID format: ${contractId}`);
@@ -80,7 +87,16 @@ async function simulateView(
     .setTimeout(30)
     .build();
 
-  const result = await rpc.simulateTransaction(tx).then((r) => { rpcSuccess(); return r; }).catch((err: unknown) => { rpcFailure(); throw err; });
+  const result = await rpc
+    .simulateTransaction(tx)
+    .then((r) => {
+      rpcSuccess();
+      return r;
+    })
+    .catch((err: unknown) => {
+      rpcFailure();
+      throw err;
+    });
   if (SorobanRpc.Api.isSimulationError(result)) {
     throw new ContractError(result.error);
   }
@@ -98,7 +114,7 @@ async function simulateView(
  * @param {string} caller - The caller's Stellar public key
  * @param {string} contractId - The Soroban contract address
  * @param {string} method - Contract method name to call
- * @param {any[]} args - Method arguments
+ * @param {unknown[]} args - Method arguments
  * @param {SignFn} signTx - Wallet signing function
  * @returns {Promise<string>} Transaction hash on success
  * @throws {ContractError} If submission or confirmation fails
@@ -107,8 +123,7 @@ async function invokeContract(
   caller: string,
   contractId: string,
   method: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  args: any[],
+  args: xdr.ScVal[] = [],
   signTx: SignFn,
 ): Promise<string> {
   if (!isValidContractId(contractId)) {
@@ -158,17 +173,32 @@ async function invokeContract(
   throw new ContractError(`Transaction not confirmed after polling: ${hash}`);
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+export interface ContractCampaignInfo {
+  title: string;
+  description: string;
+  creator: string;
+  goal: bigint;
+  deadline: bigint;
+  minContribution: bigint;
+  maxContribution: bigint;
+}
+
+export interface ContractCampaignStats {
+  totalRaised: bigint;
+  progressBps: number;
+  progressPercent: number;
+  contributorCount: number;
+}
 
 /**
  * Fetches high-level campaign metadata from the contract.
  * @param {string} [contractId=CONTRACT_ID] - The Soroban contract address
- * @returns {Promise<CampaignInfo>} Decoded campaign metadata
+ * @returns {Promise<ContractCampaignInfo>} Decoded campaign metadata
  * @throws {ContractError} If the contract call fails
  */
 export async function getCampaignInfo(
   contractId: string = CONTRACT_ID,
-): Promise<CampaignInfo> {
+): Promise<ContractCampaignInfo> {
   const [
     title,
     description,
@@ -200,12 +230,12 @@ export async function getCampaignInfo(
 /**
  * Fetches live campaign statistics (raised amount, progress, contributor count).
  * @param {string} [contractId=CONTRACT_ID] - The Soroban contract address
- * @returns {Promise<CampaignStats>} Decoded campaign statistics
+ * @returns {Promise<ContractCampaignStats>} Decoded campaign statistics
  * @throws {ContractError} If the contract call fails
  */
 export async function getCampaignStats(
   contractId: string = CONTRACT_ID,
-): Promise<CampaignStats> {
+): Promise<ContractCampaignStats> {
   const raw = (await simulateView(contractId, "get_stats")) as {
     total_raised: string | number;
     progress_bps: string | number;
@@ -213,6 +243,7 @@ export async function getCampaignStats(
   };
   return {
     totalRaised: BigInt(raw.total_raised),
+    progressBps: Number(raw.progress_bps),
     progressPercent: Number(raw.progress_bps) / 100,
     contributorCount: Number(raw.contributor_count),
   };
@@ -239,8 +270,7 @@ export async function contribute(
 ): Promise<string> {
   // Resolve token: use provided tokenId or fall back to the campaign's primary token
   const resolvedToken =
-    tokenId ??
-    String(await simulateView(contractId, "token"));
+    tokenId ?? String(await simulateView(contractId, "token"));
 
   return invokeContract(
     contributor,
@@ -250,7 +280,9 @@ export async function contribute(
       new Address(contributor).toScVal(),
       nativeToScVal(amount, { type: "i128" }),
       new Address(resolvedToken).toScVal(),
-      message != null ? nativeToScVal(message, { type: "string" }) : nativeToScVal(null),
+      message != null
+        ? nativeToScVal(message, { type: "string" })
+        : nativeToScVal(null),
     ],
     signTx,
   );

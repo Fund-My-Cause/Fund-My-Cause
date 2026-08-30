@@ -5,7 +5,7 @@ A decentralized crowdfunding platform built on the [Stellar](https://stellar.org
 [![CI Status](https://github.com/Fund-My-Cause/Fund-My-Cause/workflows/Rust%20CI/badge.svg)](https://github.com/Fund-My-Cause/Fund-My-Cause/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Contract Version](https://img.shields.io/badge/contract-v0.1.0-brightgreen)](./contracts/crowdfund/Cargo.toml)
-![Coverage](https://img.shields.io/badge/coverage-80%25-green)
+[![Contract Coverage](https://img.shields.io/badge/contract%20coverage-80%25-green)](https://github.com/Fund-My-Cause/Fund-My-Cause/actions/workflows/contract-coverage.yml)
 
 ---
 
@@ -19,7 +19,20 @@ Check out our public roadmap to see what's coming next!
 
 ![System Architecture](./docs/assets/architecture.svg)
 
-> Full component details and data-flow walkthroughs: [docs/architecture.md](./docs/architecture.md)
+### Verified data flow
+
+The diagram below documents how `apps/interface`, `services/*` and `contracts/`
+actually talk to each other today — not the idealized design. It explicitly
+labels four structural seams: the dual frontend→chain paths, the two
+independently-versioned Soroban RPC clients, the type-sharing gap between
+services, and the two disconnected alerting stacks.
+
+![Verified data flow across apps/interface, services and contracts](./docs/assets/architecture-data-flow.svg)
+
+> Diagram source (edit this, then re-render): [docs/assets/architecture-data-flow.mmd](./docs/assets/architecture-data-flow.mmd)
+
+> Full component details and data-flow walkthroughs: [docs/architecture.md](./docs/architecture.md)  
+> Backend & indexer architecture: [docs/backend-architecture.md](./docs/backend-architecture.md)
 
 ---
 
@@ -95,6 +108,10 @@ Rather than a single transaction refunding all contributors (which would fail at
 
 An optional `PlatformConfig` can be set at initialization with a fee in basis points (e.g. `250` = 2.5%). The fee is deducted from the creator's payout on withdrawal and sent to the platform address.
 
+### Contract Upgrades & State Migration
+
+Contracts support in-place bytecode upgrades via Soroban's `update_current_contract_wasm` host function, preserving contract IDs, escrow balances, and active campaign state across releases. For architectural rationale, trade-offs, and migration procedures, see **[ADR-007: Stellar Contract Upgrade Strategy](./docs/adr/ADR-007-stellar-contract-upgrade-strategy.md)** and the **[Contract Upgrade Guide](./docs/contract-upgrades.md)**.
+
 ---
 
 ## Frontend
@@ -140,6 +157,8 @@ The app uses `@stellar/freighter-api` for wallet connectivity. The `WalletContex
 ---
 
 ## Getting Started
+
+> 💡 **New contributor?** Check out the comprehensive **[Local Development Setup Guide (docs/SETUP.md)](./docs/SETUP.md)** for workspace-by-workspace instructions, contract compilation, microservices startup, and troubleshooting.
 
 ### 1. Clone
 
@@ -194,6 +213,15 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### 6. Run the backend services (optional)
+
+The frontend runs without them, but if you are working on `services/graphql-api`
+or `services/indexer`, see
+**[docs/services-local-development.md](./docs/services-local-development.md)**.
+It covers each service standalone: required environment variables, which service
+needs Redis (and which does not), why neither needs a database, and the
+known-issue workarounds you will otherwise hit on a fresh clone.
 
 ---
 
@@ -302,6 +330,9 @@ We follow [coordinated disclosure](https://en.wikipedia.org/wiki/Coordinated_vul
 
 | Resource | Description |
 |----------|-------------|
+| [docs/INDEX.md](./docs/INDEX.md) | Complete documentation index and architecture catalog |
+| [docs/SETUP.md](./docs/SETUP.md) | Comprehensive monorepo local development setup and troubleshooting guide |
+| [docs/adr/](./docs/adr/README.md) | Architecture Decision Records (including [ADR-007](./docs/adr/ADR-007-stellar-contract-upgrade-strategy.md)) |
 | [docs/api/](./docs/api/README.md) | Full contract API reference — every function, type, event, and error code |
 | [docs/tutorials/](./docs/tutorials/README.md) | Step-by-step guides: getting started, contributing, dashboards, matching, saved searches |
 | [sdks/js/](./sdks/js/README.md) | TypeScript SDK — typed client for all contract operations |

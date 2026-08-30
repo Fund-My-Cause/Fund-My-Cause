@@ -4,13 +4,14 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
+import { AchievementTier, AchievementType } from "@/types/gamification";
 import type {
   Achievement,
   AchievementProgress,
-  AchievementType,
   GamificationProfile,
   AchievementUnlockedEvent,
 } from "@/types/gamification";
+import { QUERY_KEYS } from "@/lib/queryKeys";
 
 interface UseAchievementsParams {
   userAddress?: string;
@@ -91,13 +92,15 @@ const ACHIEVEMENT_DEFINITIONS = {
     title: "Goal Crusher",
     description: "Help 5 campaigns exceed their goal by 50%+",
     icon: "💪",
-    tier: "legendary" as const,
+    tier: AchievementTier.LEGENDARY,
+    xpReward: 2000,
   },
-  trending_backer: {
+  [AchievementType.TRENDING_BACKER]: {
     title: "Trending Backer",
     description: "Be the top contributor to a trending campaign",
     icon: "🔥",
-    tier: "legendary" as const,
+    tier: AchievementTier.LEGENDARY,
+    xpReward: 2000,
   },
 };
 
@@ -107,13 +110,13 @@ const ACHIEVEMENT_DEFINITIONS = {
 async function fetchUserAchievements(
   userAddress: string
 ): Promise<Achievement[]> {
-  // TODO: Replace with actual API call
-  // For now, return mock data
+  // Mocked pending Issue #12 (achievements contract: unlock conditions are
+  // still TODO'd on-chain). Replace with a real contract/API read once #12 lands.
   const achievements: Achievement[] = [
     {
       id: "ach_1",
-      type: "first_contribution" as AchievementType,
-      tier: "common",
+      type: AchievementType.FIRST_CONTRIBUTION,
+      tier: AchievementTier.COMMON,
       title: "First Step",
       description: "Make your first contribution",
       icon: "🎬",
@@ -122,8 +125,8 @@ async function fetchUserAchievements(
     },
     {
       id: "ach_2",
-      type: "super_supporter" as AchievementType,
-      tier: "uncommon",
+      type: AchievementType.SUPER_SUPPORTER,
+      tier: AchievementTier.UNCOMMON,
       title: "Super Supporter",
       description: "Contribute to 10 different campaigns",
       icon: "⭐",
@@ -142,38 +145,38 @@ async function fetchUserAchievements(
 async function fetchAchievementProgress(
   userAddress: string
 ): Promise<AchievementProgress[]> {
-  // TODO: Replace with actual API call
-  // For now, return mock data
+  // Mocked pending Issue #12 (achievements contract: stub leaderboard ranking,
+  // unlock conditions unresolved). Replace with a real contract/API read once #12 lands.
   const progress: AchievementProgress[] = [
     {
-      type: "mega_donor",
+      type: AchievementType.MEGA_DONOR,
       title: "Mega Donor",
       description: "Reach a total of 1000 XLM in contributions",
       progress: 350,
       required: 1000,
       isUnlocked: false,
       icon: "💰",
-      tier: "rare",
+      tier: AchievementTier.RARE,
     },
     {
-      type: "consistent_contributor",
+      type: AchievementType.CONSISTENT_CONTRIBUTOR,
       title: "Consistent Contributor",
       description: "Contribute for 30 consecutive days",
       progress: 12,
       required: 30,
       isUnlocked: false,
       icon: "📅",
-      tier: "rare",
+      tier: AchievementTier.RARE,
     },
     {
-      type: "referral_champion",
+      type: AchievementType.REFERRAL_CHAMPION,
       title: "Referral Champion",
       description: "Refer 20 successful contributors",
       progress: 5,
       required: 20,
       isUnlocked: false,
       icon: "🎯",
-      tier: "epic",
+      tier: AchievementTier.EPIC,
     },
   ];
 
@@ -186,7 +189,8 @@ async function fetchAchievementProgress(
 async function fetchGamificationProfile(
   userAddress: string
 ): Promise<GamificationProfile> {
-  // TODO: Replace with actual API call
+  // Mocked pending Issue #12 (achievements contract not yet finished).
+  // Replace with a real contract/API read once #12 lands.
   const profile: GamificationProfile = {
     address: userAddress,
     achievements: [],
@@ -218,7 +222,7 @@ export function useAchievements({
     isLoading: achievementsLoading,
     error: achievementsError,
   } = useQuery<Achievement[]>({
-    queryKey: ["achievements", userAddress],
+    queryKey: QUERY_KEYS.achievements(userAddress ?? ""),
     queryFn: () =>
       userAddress
         ? fetchUserAchievements(userAddress)
@@ -232,7 +236,7 @@ export function useAchievements({
     isLoading: progressLoading,
     error: progressError,
   } = useQuery<AchievementProgress[]>({
-    queryKey: ["achievement-progress", userAddress],
+    queryKey: QUERY_KEYS.achievementProgress(userAddress ?? ""),
     queryFn: () =>
       userAddress
         ? fetchAchievementProgress(userAddress)
@@ -246,7 +250,7 @@ export function useAchievements({
     isLoading: profileLoading,
     error: profileError,
   } = useQuery<GamificationProfile>({
-    queryKey: ["gamification-profile", userAddress],
+    queryKey: QUERY_KEYS.gamificationProfile(userAddress ?? ""),
     queryFn: () =>
       userAddress
         ? fetchGamificationProfile(userAddress)
@@ -261,12 +265,13 @@ export function useAchievements({
     }: {
       achievementType: AchievementType;
     }): Promise<AchievementUnlockedEvent> => {
-      // TODO: Call API to unlock achievement
+      // Mocked pending Issue #12 (achievements contract's unlock_achievement()
+      // entrypoint is unfinished). Replace with a real contract call once #12 lands.
       return {
         achievement: {
           id: `ach_${achievementType}`,
           type: achievementType,
-          tier: "common",
+          tier: AchievementTier.COMMON,
           title: "Achievement",
           description: "You unlocked an achievement",
           icon: "🏆",
@@ -280,13 +285,13 @@ export function useAchievements({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["achievements", userAddress],
+        queryKey: QUERY_KEYS.achievements(userAddress ?? ""),
       });
       queryClient.invalidateQueries({
-        queryKey: ["achievement-progress", userAddress],
+        queryKey: QUERY_KEYS.achievementProgress(userAddress ?? ""),
       });
       queryClient.invalidateQueries({
-        queryKey: ["gamification-profile", userAddress],
+        queryKey: QUERY_KEYS.gamificationProfile(userAddress ?? ""),
       });
     },
   });
@@ -300,7 +305,8 @@ export function useAchievements({
       achievementId: string;
       platform: string;
     }): Promise<void> => {
-      // TODO: Call API to track share
+      // Mocked pending Issue #12 (no share-tracking entrypoint on the
+      // achievements contract yet). Replace with a real API/contract call once #12 lands.
     },
   });
 

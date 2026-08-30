@@ -2,10 +2,16 @@
 ///
 /// This module contains validation functions for campaign parameters and operations.
 use crate::errors::ContractError;
-use crate::types::{Category, Status};
+use crate::storage::BASIS_POINTS_MAX;
+use crate::types::Category;
 use soroban_sdk::Address;
 
 /// Validates campaign initialization parameters.
+///
+/// Single source of truth for the goal/deadline/min/max/fee checks shared by
+/// every entry point that creates a campaign (`initialize`,
+/// `initialize_from_template`) — see the crowdfund README / issue #927 for
+/// the audit that found these had drifted into independent, inline copies.
 ///
 /// # Arguments
 /// * `goal` - Campaign funding goal
@@ -18,7 +24,7 @@ use soroban_sdk::Address;
 /// # Returns
 /// * `Ok(())` if all parameters are valid
 /// * `Err(ContractError)` if any parameter is invalid
-pub fn validate_initialization(
+pub(crate) fn validate_initialization(
     goal: i128,
     deadline: u64,
     min_contribution: i128,
@@ -29,6 +35,7 @@ pub fn validate_initialization(
     if goal <= 0 {
         return Err(ContractError::InvalidGoal);
     }
+    validate_goal_not_overflow(goal)?;
     if deadline <= current_time {
         return Err(ContractError::InvalidDeadline);
     }
@@ -39,56 +46,53 @@ pub fn validate_initialization(
         return Err(ContractError::ExceedsMaximum);
     }
     if let Some(fee_bps) = platform_fee_bps {
-        if fee_bps > 10_000 {
+        if fee_bps > BASIS_POINTS_MAX as u32 {
             return Err(ContractError::InvalidFee);
         }
     }
     Ok(())
 }
 
-/// Validates a contribution amount.
+/// Validates a contribution amount meets the campaign's minimum.
 ///
-/// # Arguments
-/// * `amount` - Contribution amount
-/// * `min_contribution` - Minimum allowed contribution
-/// * `max_contribution` - Maximum allowed contribution per contributor
-/// * `current_contribution` - Current total contribution by this address
+/// Split out from [`validate_contribution_amount`] so callers that need to
+/// short-circuit before a costlier storage read (e.g. `contribute()` checks
+/// this before reading the contributor's persistent running total) can do
+/// so without duplicating the comparison.
 ///
 /// # Returns
-/// * `Ok(())` if amount is valid
-/// * `Err(ContractError)` if amount is invalid
-pub fn validate_contribution_amount(
+/// * `Ok(())` if `amount >= min_contribution`
+/// * `Err(ContractError::BelowMinimum)` otherwise
+pub(crate) fn validate_min_contribution(
     amount: i128,
     min_contribution: i128,
-    max_contribution: i128,
-    current_contribution: i128,
 ) -> Result<(), ContractError> {
     if amount < min_contribution {
         return Err(ContractError::BelowMinimum);
     }
+    Ok(())
+}
+
+/// Validates that adding `amount` to `current_contribution` does not push a
+/// single contributor's running total past the campaign's per-contributor
+/// cap. A `max_contribution` of `0` means "no cap".
+///
+/// # Returns
+/// * `Ok(())` if within the cap (or no cap is set)
+/// * `Err(ContractError::ContributorCapExceeded)` if the cap would be exceeded
+/// * `Err(ContractError::Overflow)` if the running total would overflow
+pub(crate) fn validate_contributor_cap(
+    amount: i128,
+    max_contribution: i128,
+    current_contribution: i128,
+) -> Result<(), ContractError> {
     if max_contribution > 0 {
         let new_total = current_contribution
             .checked_add(amount)
             .ok_or(ContractError::Overflow)?;
         if new_total > max_contribution {
-            return Err(ContractError::ExceedsMaximum);
+            return Err(ContractError::ContributorCapExceeded);
         }
-    }
-    Ok(())
-}
-
-/// Validates campaign status for operations.
-///
-/// # Arguments
-/// * `status` - Current campaign status
-/// * `required_status` - Required status for the operation
-///
-/// # Returns
-/// * `Ok(())` if status matches
-/// * `Err(ContractError::NotActive)` if status doesn't match
-pub fn validate_status(status: Status, required_status: Status) -> Result<(), ContractError> {
-    if status != required_status {
-        return Err(ContractError::NotActive);
     }
     Ok(())
 }
@@ -102,7 +106,10 @@ pub fn validate_status(status: Status, required_status: Status) -> Result<(), Co
 /// # Returns
 /// * `Ok(())` if deadline has passed
 /// * `Err(ContractError::CampaignStillActive)` if deadline hasn't passed
-pub fn validate_deadline_passed(current_time: u64, deadline: u64) -> Result<(), ContractError> {
+pub(crate) fn validate_deadline_passed(
+    current_time: u64,
+    deadline: u64,
+) -> Result<(), ContractError> {
     if current_time < deadline {
         return Err(ContractError::CampaignStillActive);
     }
@@ -118,75 +125,35 @@ pub fn validate_deadline_passed(current_time: u64, deadline: u64) -> Result<(), 
 /// # Returns
 /// * `Ok(())` if deadline hasn't passed
 /// * `Err(ContractError::CampaignEnded)` if deadline has passed
-pub fn validate_deadline_not_passed(current_time: u64, deadline: u64) -> Result<(), ContractError> {
+pub(crate) fn validate_deadline_not_passed(
+    current_time: u64,
+    deadline: u64,
+) -> Result<(), ContractError> {
     if current_time >= deadline {
         return Err(ContractError::CampaignEnded);
     }
     Ok(())
 }
 
-/// Validates goal has been reached.
-///
-/// # Arguments
-/// * `total_raised` - Total amount raised
-/// * `goal` - Campaign goal
-///
-/// # Returns
-/// * `Ok(())` if goal is reached
-/// * `Err(ContractError::GoalNotReached)` if goal is not reached
-pub fn validate_goal_reached(total_raised: i128, goal: i128) -> Result<(), ContractError> {
-    if total_raised < goal {
-        return Err(ContractError::GoalNotReached);
-    }
-    Ok(())
-}
-
-/// Validates goal has not been reached.
-///
-/// # Arguments
-/// * `total_raised` - Total amount raised
-/// * `goal` - Campaign goal
-///
-/// # Returns
-/// * `Ok(())` if goal is not reached
-/// * `Err(ContractError::GoalReached)` if goal is reached
-pub fn validate_goal_not_reached(total_raised: i128, goal: i128) -> Result<(), ContractError> {
-    if total_raised >= goal {
-        return Err(ContractError::GoalReached);
-    }
-    Ok(())
-}
-
-/// Validates a new deadline is later than current deadline.
+/// Validates that a new deadline timestamp is strictly later than a
+/// reference point. Used both for extending an existing deadline (reference
+/// = the current stored deadline, e.g. `extend_deadline`/`propose_extension`)
+/// and for setting a fresh deadline that must simply be in the future
+/// (reference = the current ledger time, e.g. `clone_campaign`).
 ///
 /// # Arguments
 /// * `new_deadline` - Proposed new deadline
-/// * `current_deadline` - Current deadline
+/// * `reference` - The timestamp `new_deadline` must exceed
 ///
 /// # Returns
-/// * `Ok(())` if new deadline is later
-/// * `Err(ContractError::InvalidDeadline)` if new deadline is not later
-pub fn validate_deadline_extension(
+/// * `Ok(())` if `new_deadline` is later than `reference`
+/// * `Err(ContractError::InvalidDeadline)` if it is not
+pub(crate) fn validate_deadline_extension(
     new_deadline: u64,
-    current_deadline: u64,
+    reference: u64,
 ) -> Result<(), ContractError> {
-    if new_deadline <= current_deadline {
+    if new_deadline <= reference {
         return Err(ContractError::InvalidDeadline);
-    }
-    Ok(())
-}
-
-/// Validates insurance fee configuration.
-///
-/// # Arguments
-/// * `fee_bps` - Insurance fee in basis points
-///
-/// # Returns
-/// * `Ok(())` if fee is valid
-/// * `Err(ContractError::InvalidFee)` if fee is invalid
-pub fn validate_insurance_fee(fee_bps: u32) -> Result<(), ContractError> {
-    if fee_bps > 10_000 {
-        return Err(ContractError::InvalidFee);
     }
     Ok(())
 }
@@ -202,7 +169,7 @@ pub fn validate_insurance_fee(fee_bps: u32) -> Result<(), ContractError> {
 /// # Returns
 /// * `Ok(())` if parameters are valid
 /// * `Err(ContractError::InvalidRecurringPlan)` if parameters are invalid
-pub fn validate_recurring_plan(
+pub(crate) fn validate_recurring_plan(
     amount: i128,
     interval: u64,
     end_date: u64,
@@ -222,7 +189,7 @@ pub fn validate_recurring_plan(
 /// # Returns
 /// * `Ok(())` if parameters are valid
 /// * `Err(ContractError::InvalidDelegation)` if parameters are invalid
-pub fn validate_delegation(amount: i128) -> Result<(), ContractError> {
+pub(crate) fn validate_delegation(amount: i128) -> Result<(), ContractError> {
     if amount <= 0 {
         return Err(ContractError::InvalidDelegation);
     }
@@ -238,27 +205,12 @@ pub fn validate_delegation(amount: i128) -> Result<(), ContractError> {
 /// # Returns
 /// * `Ok(())` if refund is valid
 /// * `Err(ContractError::RefundLimitExceeded)` if refund exceeds limit
-pub fn validate_partial_refund(
+pub(crate) fn validate_partial_refund(
     refund_amount: i128,
     total_contribution: i128,
 ) -> Result<(), ContractError> {
     if refund_amount > total_contribution / 2 {
         return Err(ContractError::RefundLimitExceeded);
-    }
-    Ok(())
-}
-
-/// Validates message length.
-///
-/// # Arguments
-/// * `message_len` - Length of the message
-///
-/// # Returns
-/// * `Ok(())` if message is valid
-/// * `Err(ContractError::MessageTooLong)` if message is too long
-pub fn validate_message_length(message_len: usize) -> Result<(), ContractError> {
-    if message_len > 256 {
-        return Err(ContractError::MessageTooLong);
     }
     Ok(())
 }
@@ -273,7 +225,10 @@ pub fn validate_message_length(message_len: usize) -> Result<(), ContractError> 
 /// * `Ok(())` if valid
 /// * `Err(ContractError::StringEmpty)` if the string is empty
 /// * `Err(ContractError::StringTooLong)` if the string exceeds `max_len`
-pub fn validate_string_length(s: &soroban_sdk::String, max_len: u32) -> Result<(), ContractError> {
+pub(crate) fn validate_string_length(
+    s: &soroban_sdk::String,
+    max_len: u32,
+) -> Result<(), ContractError> {
     let len = s.len();
     if len == 0 {
         return Err(ContractError::StringEmpty);
@@ -286,17 +241,19 @@ pub fn validate_string_length(s: &soroban_sdk::String, max_len: u32) -> Result<(
 
 /// Validates that an `i128` amount is strictly positive (> 0).
 ///
+/// Delegates to `common::validate_positive_amount` — the single canonical
+/// implementation shared across contracts.  Maps `CommonError::InvalidInput`
+/// onto `ContractError::AmountNotPositive` via the `From<CommonError>` impl
+/// in `errors.rs`.
+///
 /// # Arguments
 /// * `amount` - The amount to validate
 ///
 /// # Returns
 /// * `Ok(())` if amount > 0
 /// * `Err(ContractError::AmountNotPositive)` otherwise
-pub fn validate_positive_amount(amount: i128) -> Result<(), ContractError> {
-    if amount <= 0 {
-        return Err(ContractError::AmountNotPositive);
-    }
-    Ok(())
+pub(crate) fn validate_positive_amount(amount: i128) -> Result<(), ContractError> {
+    common::validate_positive_amount(amount).map_err(|_| ContractError::AmountNotPositive)
 }
 
 /// Validates that the platform fee address is not the same as the creator.
@@ -311,7 +268,7 @@ pub fn validate_positive_amount(amount: i128) -> Result<(), ContractError> {
 /// # Returns
 /// * `Ok(())` if addresses differ
 /// * `Err(ContractError::SelfFeeAddress)` if they are the same
-pub fn validate_address_not_self(
+pub(crate) fn validate_address_not_self(
     creator: &Address,
     fee_address: &Address,
 ) -> Result<(), ContractError> {
@@ -329,7 +286,7 @@ pub fn validate_address_not_self(
 /// # Returns
 /// * `Ok(())` if fee_bps <= 10_000
 /// * `Err(ContractError::InvalidFee)` otherwise
-pub fn validate_fee_bps(fee_bps: u32) -> Result<(), ContractError> {
+pub(crate) fn validate_fee_bps(fee_bps: u32) -> Result<(), ContractError> {
     if fee_bps > 10_000 {
         return Err(ContractError::InvalidFee);
     }
@@ -352,7 +309,7 @@ pub fn validate_fee_bps(fee_bps: u32) -> Result<(), ContractError> {
 /// * `Ok(())` if the campaign is eligible for refunds
 /// * `Err(ContractError::CampaignStillActive)` if the deadline has not passed
 /// * `Err(ContractError::GoalReached)` if the goal was met
-pub fn validate_refund_eligibility(
+pub(crate) fn validate_refund_eligibility(
     now: u64,
     deadline: u64,
     total: i128,
@@ -379,7 +336,7 @@ pub fn validate_refund_eligibility(
 /// # Returns
 /// * `Ok(())` if goal is safe
 /// * `Err(ContractError::GoalOverflow)` if goal is dangerously large
-pub fn validate_goal_not_overflow(goal: i128) -> Result<(), ContractError> {
+pub(crate) fn validate_goal_not_overflow(goal: i128) -> Result<(), ContractError> {
     if goal > i128::MAX / 2 {
         return Err(ContractError::GoalOverflow);
     }
@@ -396,7 +353,7 @@ pub fn validate_goal_not_overflow(goal: i128) -> Result<(), ContractError> {
 /// # Returns
 /// * `Ok(())` for any valid `Category` variant
 /// * `Err(ContractError::InvalidCategory)` for unrecognised values
-pub fn validate_category(category: &Category) -> Result<(), ContractError> {
+pub(crate) fn validate_category(category: &Category) -> Result<(), ContractError> {
     match category {
         Category::Charity
         | Category::Technology
@@ -407,4 +364,31 @@ pub fn validate_category(category: &Category) -> Result<(), ContractError> {
         #[allow(unreachable_patterns)]
         _ => Err(ContractError::InvalidCategory),
     }
+}
+
+/// Validates a multi-sig governance configuration.
+///
+/// A configuration is valid only when there is at least one governor, at least
+/// one required approval, and the required-approval threshold does not exceed the
+/// number of governors (otherwise no proposal could ever be executed).
+///
+/// # Arguments
+/// * `required_approvals` - Minimum approvals needed to execute a proposal
+/// * `num_governors` - Number of governor addresses configured
+/// * `timelock_delay` - Timelock delay in seconds (currently unrestricted, but
+///   validated for presence to keep the signature stable)
+///
+/// # Returns
+/// * `Ok(())` if the configuration is internally consistent
+/// * `Err(ContractError::InvalidInput)` otherwise
+pub(crate) fn validate_governance_config(
+    required_approvals: u32,
+    num_governors: u32,
+    timelock_delay: u64,
+) -> Result<(), ContractError> {
+    let _ = timelock_delay; // no upper/lower bound enforced yet
+    if num_governors == 0 || required_approvals == 0 || required_approvals > num_governors {
+        return Err(ContractError::InvalidInput);
+    }
+    Ok(())
 }

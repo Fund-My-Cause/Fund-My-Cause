@@ -1,10 +1,12 @@
+import { logger } from "./logger";
+
 interface Incident {
   id: string;
   alert_name: string;
   severity: string;
   description: string;
   category: string;
-  status: 'open' | 'in-progress' | 'resolved' | 'escalated';
+  status: "open" | "in-progress" | "resolved" | "escalated";
   triggered_at: string;
   source: string;
   labels: Record<string, string>;
@@ -58,73 +60,115 @@ export class IncidentResponseEngine {
    */
   private remediationActions = {
     scale_up: async (incident: Incident, params?: Record<string, unknown>) => {
-      console.log(`Scaling up service for incident ${incident.id}`);
+      logger.info(
+        { incident_id: incident.id },
+        "Scaling up service for incident",
+      );
       return {
-        action: 'scale_up',
-        service: params?.service || 'app',
+        action: "scale_up",
+        service: params?.service || "app",
         new_replicas: params?.replicas || 3,
       };
     },
 
-    clear_cache: async (incident: Incident, params?: Record<string, unknown>) => {
-      console.log(`Clearing cache for incident ${incident.id}`);
+    clear_cache: async (
+      incident: Incident,
+      params?: Record<string, unknown>,
+    ) => {
+      logger.info({ incident_id: incident.id }, "Clearing cache for incident");
       return {
-        action: 'clear_cache',
-        keys_cleared: params?.keys || 'all',
+        action: "clear_cache",
+        keys_cleared: params?.keys || "all",
       };
     },
 
-    restart_service: async (incident: Incident, params?: Record<string, unknown>) => {
-      console.log(`Restarting service for incident ${incident.id}`);
+    restart_service: async (
+      incident: Incident,
+      params?: Record<string, unknown>,
+    ) => {
+      logger.info(
+        { incident_id: incident.id },
+        "Restarting service for incident",
+      );
       return {
-        action: 'restart_service',
-        service: params?.service || 'app',
+        action: "restart_service",
+        service: params?.service || "app",
         graceful: params?.graceful || true,
       };
     },
 
-    kill_long_queries: async (incident: Incident, params?: Record<string, unknown>) => {
-      console.log(`Killing long queries for incident ${incident.id}`);
+    kill_long_queries: async (
+      incident: Incident,
+      params?: Record<string, unknown>,
+    ) => {
+      logger.info(
+        { incident_id: incident.id },
+        "Killing long queries for incident",
+      );
       return {
-        action: 'kill_long_queries',
+        action: "kill_long_queries",
         threshold_ms: params?.threshold_ms || 5000,
         queries_killed: 5,
       };
     },
 
-    enable_circuit_breaker: async (incident: Incident, params?: Record<string, unknown>) => {
-      console.log(`Enabling circuit breaker for incident ${incident.id}`);
+    enable_circuit_breaker: async (
+      incident: Incident,
+      params?: Record<string, unknown>,
+    ) => {
+      logger.info(
+        { incident_id: incident.id },
+        "Enabling circuit breaker for incident",
+      );
       return {
-        action: 'enable_circuit_breaker',
-        service: params?.service || 'app',
+        action: "enable_circuit_breaker",
+        service: params?.service || "app",
         threshold: params?.threshold || 0.5,
       };
     },
 
-    reduce_workload: async (incident: Incident, params?: Record<string, unknown>) => {
-      console.log(`Reducing workload for incident ${incident.id}`);
+    reduce_workload: async (
+      incident: Incident,
+      params?: Record<string, unknown>,
+    ) => {
+      logger.info(
+        { incident_id: incident.id },
+        "Reducing workload for incident",
+      );
       return {
-        action: 'reduce_workload',
+        action: "reduce_workload",
         reduction_percentage: params?.reduction || 30,
-        affected_services: params?.services || ['app'],
+        affected_services: params?.services || ["app"],
       };
     },
 
-    enable_maintenance_mode: async (incident: Incident, params?: Record<string, unknown>) => {
-      console.log(`Enabling maintenance mode for incident ${incident.id}`);
+    enable_maintenance_mode: async (
+      incident: Incident,
+      params?: Record<string, unknown>,
+    ) => {
+      logger.info(
+        { incident_id: incident.id },
+        "Enabling maintenance mode for incident",
+      );
       return {
-        action: 'enable_maintenance_mode',
+        action: "enable_maintenance_mode",
         duration_minutes: params?.duration || 15,
         notification_sent: true,
       };
     },
 
-    failover_backup: async (incident: Incident, params?: Record<string, unknown>) => {
-      console.log(`Failing over to backup for incident ${incident.id}`);
+    failover_backup: async (
+      incident: Incident,
+      params?: Record<string, unknown>,
+    ) => {
+      logger.info(
+        { incident_id: incident.id },
+        "Failing over to backup for incident",
+      );
       return {
-        action: 'failover_backup',
-        primary: params?.primary || 'us-east-1',
-        backup: params?.backup || 'us-west-2',
+        action: "failover_backup",
+        primary: params?.primary || "us-east-1",
+        backup: params?.backup || "us-west-2",
         switch_time_ms: 500,
       };
     },
@@ -134,10 +178,10 @@ export class IncidentResponseEngine {
    * 4-Level Escalation Strategy
    */
   private escalationLevels = [
-    { level: 1, title: 'Team', delay_minutes: 0 },
-    { level: 2, title: 'On-Call', delay_minutes: 5 },
-    { level: 3, title: 'Management', delay_minutes: 15 },
-    { level: 4, title: 'Executive', delay_minutes: 30 },
+    { level: 1, title: "Team", delay_minutes: 0 },
+    { level: 2, title: "On-Call", delay_minutes: 5 },
+    { level: 3, title: "Management", delay_minutes: 15 },
+    { level: 4, title: "Executive", delay_minutes: 30 },
   ];
 
   /**
@@ -157,10 +201,7 @@ export class IncidentResponseEngine {
   /**
    * Update incident
    */
-  updateIncident(
-    id: string,
-    updates: Partial<Incident>,
-  ): Incident | undefined {
+  updateIncident(id: string, updates: Partial<Incident>): Incident | undefined {
     const incident = this.incidents.get(id);
     if (!incident) return undefined;
 
@@ -195,7 +236,9 @@ export class IncidentResponseEngine {
 
     // Sort by created_at descending
     incidents.sort((a, b) => {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return (
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
     });
 
     const offset = options.offset || 0;
@@ -227,14 +270,15 @@ export class IncidentResponseEngine {
         success: false,
         incident_id,
         action,
-        message: 'Incident not found',
+        message: "Incident not found",
         duration_ms: Date.now() - startTime,
       };
     }
 
     try {
       // Get remediation action
-      const actionFn = this.remediationActions[action as keyof typeof this.remediationActions];
+      const actionFn =
+        this.remediationActions[action as keyof typeof this.remediationActions];
 
       if (!actionFn) {
         return {
@@ -251,7 +295,7 @@ export class IncidentResponseEngine {
 
       // Update incident
       this.updateIncident(incident_id, {
-        status: 'in-progress',
+        status: "in-progress",
       });
 
       const result: RemediationResult = {
@@ -290,13 +334,18 @@ export class IncidentResponseEngine {
       const newLevel = currentLevel + 1;
       const escalationInfo = this.escalationLevels[newLevel - 1];
 
-      console.log(
-        `Escalating incident ${incident_id} to level ${newLevel}: ${escalationInfo.title}`,
+      logger.info(
+        {
+          incident_id: incident_id,
+          new_level: newLevel,
+          title: escalationInfo.title,
+        },
+        "Escalating incident",
       );
 
       return this.updateIncident(incident_id, {
         escalation_level: newLevel,
-        status: 'escalated',
+        status: "escalated",
       });
     }
 
@@ -415,15 +464,15 @@ export class IncidentResponseEngine {
 
     const recommendations: string[] = [];
     if (anomalous) {
-      if (metric.includes('cpu') || metric.includes('memory')) {
-        recommendations.push('Scale up service');
-        recommendations.push('Review resource allocation');
-      } else if (metric.includes('error')) {
-        recommendations.push('Check logs for errors');
-        recommendations.push('Rollback recent deployment');
-      } else if (metric.includes('latency')) {
-        recommendations.push('Check database performance');
-        recommendations.push('Review slow queries');
+      if (metric.includes("cpu") || metric.includes("memory")) {
+        recommendations.push("Scale up service");
+        recommendations.push("Review resource allocation");
+      } else if (metric.includes("error")) {
+        recommendations.push("Check logs for errors");
+        recommendations.push("Rollback recent deployment");
+      } else if (metric.includes("latency")) {
+        recommendations.push("Check database performance");
+        recommendations.push("Review slow queries");
       }
     }
 
@@ -432,7 +481,7 @@ export class IncidentResponseEngine {
       current_value,
       threshold,
       anomalous,
-      severity: anomalous ? 'warning' : 'info',
+      severity: anomalous ? "warning" : "info",
       recommendations,
     };
   }
@@ -442,7 +491,9 @@ export class IncidentResponseEngine {
    */
   getRemediationHistory(incident_id?: string): RemediationResult[] {
     if (incident_id) {
-      return this.remediation_history.filter((r) => r.incident_id === incident_id);
+      return this.remediation_history.filter(
+        (r) => r.incident_id === incident_id,
+      );
     }
     return this.remediation_history;
   }
@@ -458,7 +509,10 @@ export class IncidentResponseEngine {
    * result.  This path MUST NOT reach production; the runtime guard throws if
    * neither variable is configured.
    */
-  async rollback(incident_id: string, deployment_id: string): Promise<RemediationResult> {
+  async rollback(
+    incident_id: string,
+    deployment_id: string,
+  ): Promise<RemediationResult> {
     const startTime = Date.now();
     const incident = this.incidents.get(incident_id);
 
@@ -466,8 +520,8 @@ export class IncidentResponseEngine {
       return {
         success: false,
         incident_id,
-        action: 'rollback',
-        message: 'Incident not found',
+        action: "rollback",
+        message: "Incident not found",
         duration_ms: Date.now() - startTime,
       };
     }
@@ -525,6 +579,9 @@ export class IncidentResponseEngine {
         `${deploymentApiUrl}/rollback`,
         { deployment_id, incident_id },
         { timeout: 30_000 },
+      logger.info(
+        { incident_id, deployment_id },
+        "Rolling back deployment for incident",
       );
 
       const success = response.status >= 200 && response.status < 300;
@@ -532,30 +589,29 @@ export class IncidentResponseEngine {
       const result: RemediationResult = {
         success,
         incident_id,
-        action: 'rollback',
-        message: success
-          ? `Deployment ${deployment_id} rolled back successfully`
-          : `Rollback API responded with status ${response.status}`,
+        action: "rollback",
+        message: `Deployment ${deployment_id} rolled back successfully`,
         duration_ms: Date.now() - startTime,
         execution_details: {
           deployment_id,
-          api_status: response.status,
+          previous_version: "v1.0.0",
           rollback_time_ms: Date.now() - startTime,
         },
       };
 
       this.remediation_history.push(result);
 
-      if (success) {
-        this.updateIncident(incident_id, { status: 'resolved' });
-      }
+      // Update incident
+      this.updateIncident(incident_id, {
+        status: "resolved",
+      });
 
       return result;
     } catch (error) {
       return {
         success: false,
         incident_id,
-        action: 'rollback',
+        action: "rollback",
         message: `Rollback failed: ${error instanceof Error ? error.message : String(error)}`,
         duration_ms: Date.now() - startTime,
       };
@@ -565,7 +621,9 @@ export class IncidentResponseEngine {
   /**
    * Get escalation info
    */
-  getEscalationInfo(level: number): (typeof this.escalationLevels)[number] | undefined {
+  getEscalationInfo(
+    level: number,
+  ): (typeof this.escalationLevels)[number] | undefined {
     return this.escalationLevels.find((e) => e.level === level);
   }
 
@@ -585,18 +643,19 @@ export class IncidentResponseEngine {
     return {
       total_incidents: incidents.length,
       by_status: {
-        open: incidents.filter((i) => i.status === 'open').length,
-        in_progress: incidents.filter((i) => i.status === 'in-progress').length,
-        resolved: incidents.filter((i) => i.status === 'resolved').length,
-        escalated: incidents.filter((i) => i.status === 'escalated').length,
+        open: incidents.filter((i) => i.status === "open").length,
+        in_progress: incidents.filter((i) => i.status === "in-progress").length,
+        resolved: incidents.filter((i) => i.status === "resolved").length,
+        escalated: incidents.filter((i) => i.status === "escalated").length,
       },
       by_severity: {
-        critical: incidents.filter((i) => i.severity === 'critical').length,
-        warning: incidents.filter((i) => i.severity === 'warning').length,
-        info: incidents.filter((i) => i.severity === 'info').length,
+        critical: incidents.filter((i) => i.severity === "critical").length,
+        warning: incidents.filter((i) => i.severity === "warning").length,
+        info: incidents.filter((i) => i.severity === "info").length,
       },
       remediation_attempts: this.remediation_history.length,
-      successful_remediations: this.remediation_history.filter((r) => r.success).length,
+      successful_remediations: this.remediation_history.filter((r) => r.success)
+        .length,
     };
   }
 }

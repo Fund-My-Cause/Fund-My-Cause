@@ -1,331 +1,488 @@
-import { Keypair, Server, Networks, TransactionBuilder } from "@stellar/stellar-sdk";
+import {
+  rpc as SorobanRpc,
+  Keypair,
+  Contract,
+  TransactionBuilder,
+  BASE_FEE,
+  scValToNative,
+  nativeToScVal,
+  Address,
+} from "@stellar/stellar-sdk";
+import { createRpcServer } from "@fund-my-cause/rpc-client";
+import type { CampaignStatus } from "../types.js";
 import type {
+  AuthenticatedUser,
   Campaign,
+  CampaignFilter,
   Contribution,
   User,
-  CampaignStatus,
   GetCampaignsParams,
   CreateCampaignInput,
   UpdateCampaignInput,
   RecordContributionInput,
   Statistics,
+  RawCampaignInfo,
+  RawCampaignStats,
 } from "../types.js";
+import { mapCampaignStatus, nowUtcIso } from "@fund-my-cause/shared-utils";
+import { logger } from "../logger.js";
 
 /**
- * Service for interacting with Stellar contracts
+ * Run a contract call, logging (with structured fields, not console.*) and
+ * swallowing any failure behind `fallback` instead of propagating it.
+ *
+ * Every read method below tolerates individual on-chain/RPC failures the
+ * same way — this is the shared wrapper that replaces the repeated
+ * try/catch + console.error block that used to appear in each of them.
  */
-export class ContractService {
-  private server: Server;
-  private networkPassphrase: string;
+async function withErrorLogging<T>(
+  operation: string,
+  fallback: T,
+  fn: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    logger.error(
+      { err: error, operation },
+      `Contract call failed: ${operation}`,
+    );
+    return fallback;
+  }
+}
 
-  constructor(rpcUrl: string, networkType: "testnet" | "mainnet" = "testnet") {
-    this.server = new Server(rpcUrl);
-    this.networkPassphrase =
-      networkType === "mainnet" ? Networks.PUBLIC_NETWORK : Networks.TESTNET_NETWORK;
+// ── Configuration ──────────────────────────────────────────────────────────────
+
+export interface ContractServiceConfig {
+  rpcUrl: string;
+  networkPassphrase: string;
+  /** Optional registry contract address for listing/searching campaigns. */
+  registryContractId?: string;
+}
+
+function stroopsToIsoString(stroops: bigint): string {
+  return new Date(Number(stroops) * 1000).toISOString();
+}
+
+const SOROBAN_DUMMY = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN";
+
+// ── Service ────────────────────────────────────────────────────────────────────
+
+export class ContractService {
+  private readonly server: SorobanRpc.Server;
+  readonly networkPassphrase: string;
+  readonly registryContractId?: string;
+
+  constructor(config: ContractServiceConfig) {
+    // Use the shared factory so both graphql-api and indexer construct
+    // rpc.Server with identical options (allowHttp derived from URL scheme).
+    this.server = createRpcServer({ url: config.rpcUrl });
+    this.networkPassphrase = config.networkPassphrase;
+    this.registryContractId = config.registryContractId;
+  }
+
+  // ── Internal: Soroban view call ────────────────────────────────────────────
+
+  /**
+   * Execute a read-only contract view function via simulateTransaction.
+   * `contractId` is the Soroban contract address to call.
+   */
+  private async view<T>(
+    contractId: string,
+    method: string,
+    args: ReturnType<typeof nativeToScVal>[] = [],
+  ): Promise<T> {
+    const contract = new Contract(contractId);
+
+    const account = {
+      accountId: () => SOROBAN_DUMMY,
+      sequenceNumber: () => "0",
+      incrementSequenceNumber: () => {},
+    } as unknown as ConstructorParameters<typeof TransactionBuilder>[0];
+
+    const tx = new TransactionBuilder(account, {
+      fee: BASE_FEE,
+      networkPassphrase: this.networkPassphrase,
+    })
+      .addOperation(contract.call(method, ...args))
+      .setTimeout(30)
+      .build();
+
+    const result = await this.server.simulateTransaction(tx);
+    if (SorobanRpc.Api.isSimulationError(result)) {
+      throw new Error(
+        `Contract call failed [${contractId}.${method}]: ${result.error}`,
+      );
+    }
+    return scValToNative(
+      (result as SorobanRpc.Api.SimulateTransactionSuccessResponse).result!
+        .retval,
+    ) as T;
+  }
+
+  // ── Internal: fetch single campaign from its contract ──────────────────────
+
+  private async fetchCampaign(id: string): Promise<Campaign | null> {
+    return withErrorLogging(`fetchCampaign(${id})`, null, async () => {
+      const [info, stats] = await Promise.all([
+        this.view<RawCampaignInfo>(id, "get_campaign_info"),
+        this.view<RawCampaignStats>(id, "get_stats"),
+      ]);
+
+      return {
+        id,
+        contractId: id,
+        title: info.title,
+        description: info.description,
+        creator: info.creator,
+        goal: stats.goal,
+        raised: stats.total_raised,
+        deadline: stroopsToIsoString(info.deadline),
+        status: mapCampaignStatus(info.status),
+        category: info.category,
+        minContribution: info.min_contribution,
+        maxContribution: info.max_contribution,
+        totalContributors: stats.contributor_count,
+        token: info.token,
+        platformFeeBps: info.has_platform_config
+          ? info.platform_fee_bps
+          : undefined,
+        hasRBACEnabled: info.has_platform_config,
+        createdAt: nowUtcIso(),
+        updatedAt: nowUtcIso(),
+      };
+    });
   }
 
   /**
-   * Get a single campaign by ID
+   * List every campaign ID known to the registry.
+   *
+   * The registry's `list` view is offset/limit paginated with no "give me
+   * everything" mode, so callers that need the full set (stats, trending,
+   * search, per-user aggregation) page through it with an upper bound well
+   * beyond any realistic campaign count. Centralized here so that workaround
+   * exists in exactly one place instead of being copy-pasted per call site.
+   */
+  private async listAllCampaignIds(): Promise<string[]> {
+    if (!this.registryContractId) return [];
+    return this.view<string[]>(this.registryContractId, "list", [
+      nativeToScVal(0, { type: "u32" }),
+      nativeToScVal(1_000_000, { type: "u32" }),
+    ]);
+  }
+
+  // ── Public read methods ────────────────────────────────────────────────────
+
+  /**
+   * Get a single campaign by its Soroban contract address.
    */
   async getCampaign(id: string): Promise<Campaign | null> {
-    try {
-      // In a real implementation, this would call the contract
-      // For now, returning mock data structure
-      const campaign: Campaign = {
-        id,
-        contractId: `contract_${id}`,
-        title: "Sample Campaign",
-        description: "A sample campaign for testing",
-        creator: "GXXX...",
-        goal: BigInt("10000000000"), // 1000 XLM (10^9 stroops)
-        raised: BigInt("5000000000"), // 500 XLM
-        deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        status: "ACTIVE" as CampaignStatus,
-        category: "Technology",
-        image: "https://example.com/image.jpg",
-        minContribution: BigInt("1000000"), // 0.1 XLM
-        totalContributors: 42,
-        token: "native",
-        platformFeeBps: 250, // 2.5%
-        hasRBACEnabled: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      return campaign;
-    } catch (error) {
-      console.error(`Error fetching campaign ${id}:`, error);
-      return null;
-    }
+    return this.fetchCampaign(id);
   }
 
   /**
-   * Get multiple campaigns with filtering, pagination, and sorting
+   * List campaigns via the registry contract.
+   * Requires `registryContractId` to be configured in the constructor.
    */
   async getCampaigns(params: GetCampaignsParams): Promise<Campaign[]> {
-    try {
-      const campaigns: Campaign[] = [];
+    if (!this.registryContractId) {
+      logger.warn("getCampaigns called without registryContractId configured");
+      return [];
+    }
 
-      // Mock data - in production, fetch from contract
-      for (let i = 0; i < params.pagination.limit; i++) {
-        const index = params.pagination.offset + i;
-        const campaign: Campaign = {
-          id: `campaign_${index}`,
-          contractId: `contract_${index}`,
-          title: `Campaign ${index}`,
-          description: `Description for campaign ${index}`,
-          creator: `creator_${index}`,
-          goal: BigInt(10000000000 + index * 1000000000),
-          raised: BigInt(Math.floor(Math.random() * 5000000000)),
-          deadline: new Date(Date.now() + (30 - index % 30) * 24 * 60 * 60 * 1000).toISOString(),
-          status: (["ACTIVE", "SUCCESSFUL", "PAUSED"][index % 3] as CampaignStatus),
-          category: ["Technology", "Healthcare", "Education"][index % 3],
-          image: `https://example.com/image_${index}.jpg`,
-          minContribution: BigInt("1000000"),
-          totalContributors: Math.floor(Math.random() * 100),
-          token: "native",
-          platformFeeBps: 250,
-          hasRBACEnabled: index % 2 === 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+    return withErrorLogging("getCampaigns", [], async () => {
+      const { pagination } = params;
+      const ids = await this.view<string[]>(this.registryContractId!, "list", [
+        nativeToScVal(pagination.offset, { type: "u32" }),
+        nativeToScVal(pagination.limit, { type: "u32" }),
+      ]);
 
-        campaigns.push(campaign);
+      const campaigns = (
+        await Promise.all(ids.map((id) => this.fetchCampaign(id)))
+      ).filter(Boolean) as Campaign[];
+
+      if (params.filter?.status?.length) {
+        const allowed = new Set(params.filter.status);
+        return campaigns.filter((c) => allowed.has(c.status));
       }
 
       return campaigns;
-    } catch (error) {
-      console.error("Error fetching campaigns:", error);
-      return [];
-    }
+    });
   }
 
   /**
-   * Get total campaign count
+   * Get total campaign count from the registry.
    */
-  async getCampaignCount(filter?: any): Promise<number> {
-    try {
-      // Mock implementation
-      return 1000;
-    } catch (error) {
-      console.error("Error getting campaign count:", error);
-      return 0;
-    }
+  async getCampaignCount(_filter?: CampaignFilter): Promise<number> {
+    if (!this.registryContractId) return 0;
+    return withErrorLogging("getCampaignCount", 0, async () => {
+      const all = await this.listAllCampaignIds();
+      return all.length;
+    });
   }
 
   /**
-   * Get trending campaigns
+   * Get trending campaigns (fetches all active campaigns and sorts by contribution velocity).
+   * Requires `registryContractId` to be configured.
    */
   async getTrendingCampaigns(limit: number): Promise<Campaign[]> {
-    try {
-      const campaigns: Campaign[] = [];
+    if (!this.registryContractId) return [];
+    return withErrorLogging("getTrendingCampaigns", [], async () => {
+      const ids = await this.listAllCampaignIds();
 
-      for (let i = 0; i < limit; i++) {
-        campaigns.push({
-          id: `trending_${i}`,
-          contractId: `contract_trending_${i}`,
-          title: `Trending Campaign ${i}`,
-          description: `A trending campaign`,
-          creator: `trending_creator_${i}`,
-          goal: BigInt("10000000000"),
-          raised: BigInt("8000000000"),
-          deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-          status: "ACTIVE" as CampaignStatus,
-          category: "Technology",
-          minContribution: BigInt("1000000"),
-          totalContributors: Math.floor(Math.random() * 200) + 50,
-          token: "native",
-          platformFeeBps: 250,
-          hasRBACEnabled: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      const withMetrics = (
+        await Promise.all(
+          ids.map(async (id) => {
+            const campaign = await this.fetchCampaign(id);
+            if (!campaign || campaign.status !== "Active") return null;
+            return campaign;
+          }),
+        )
+      ).filter(Boolean) as Campaign[];
 
-      return campaigns;
-    } catch (error) {
-      console.error("Error fetching trending campaigns:", error);
-      return [];
-    }
+      return withMetrics.slice(0, limit);
+    });
   }
 
   /**
-   * Search campaigns by query
+   * Search campaigns by title/description (client-side filter).
+   * Requires `registryContractId` to be configured.
    */
   async searchCampaigns(query: string, limit: number): Promise<Campaign[]> {
-    try {
-      const campaigns: Campaign[] = [];
+    if (!this.registryContractId) return [];
+    return withErrorLogging("searchCampaigns", [], async () => {
+      const ids = await this.listAllCampaignIds();
 
-      for (let i = 0; i < limit; i++) {
-        campaigns.push({
-          id: `search_${i}`,
-          contractId: `contract_search_${i}`,
-          title: `${query} Campaign ${i}`,
-          description: `A campaign matching: ${query}`,
-          creator: `creator_search_${i}`,
-          goal: BigInt("10000000000"),
-          raised: BigInt(Math.floor(Math.random() * 5000000000)),
-          deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-          status: "ACTIVE" as CampaignStatus,
-          category: "Technology",
-          minContribution: BigInt("1000000"),
-          totalContributors: Math.floor(Math.random() * 100),
-          token: "native",
-          platformFeeBps: 250,
-          hasRBACEnabled: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      const q = query.toLowerCase();
+      const matches = (
+        await Promise.all(
+          ids.map(async (id) => {
+            const c = await this.fetchCampaign(id);
+            if (!c) return null;
+            if (
+              c.title.toLowerCase().includes(q) ||
+              c.description.toLowerCase().includes(q)
+            ) {
+              return c;
+            }
+            return null;
+          }),
+        )
+      ).filter(Boolean) as Campaign[];
 
-      return campaigns;
-    } catch (error) {
-      console.error("Error searching campaigns:", error);
-      return [];
-    }
+      return matches.slice(0, limit);
+    });
   }
 
   /**
-   * Get user profile
+   * Get user profile by aggregating on-chain data across all known campaigns.
    */
   async getUser(address: string): Promise<User | null> {
-    try {
-      const user: User = {
+    return withErrorLogging(`getUser(${address})`, null, async () => {
+      let totalContributed = BigInt(0);
+      let contributionCount = 0;
+
+      if (this.registryContractId) {
+        const ids = await this.listAllCampaignIds();
+
+        for (const campaignId of ids) {
+          try {
+            const contribAmount = await this.view<bigint>(
+              campaignId,
+              "contribution",
+              [new Address(address).toScVal()],
+            );
+            if (contribAmount > 0) {
+              totalContributed += contribAmount;
+              contributionCount++;
+            }
+          } catch {
+            // Campaign may not exist or be inaccessible; skip
+          }
+        }
+      }
+
+      return {
         address,
-        totalContributed: BigInt("50000000000"),
-        contributionCount: 25,
+        totalContributed,
+        contributionCount,
         campaigns: [],
         contributions: [],
-        joinedAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        joinedAt: nowUtcIso(),
       };
-
-      return user;
-    } catch (error) {
-      console.error(`Error fetching user ${address}:`, error);
-      return null;
-    }
+    });
   }
 
   /**
-   * Get platform statistics
+   * Get platform statistics by aggregating all registered campaigns.
    */
   async getStats(): Promise<Statistics> {
-    try {
-      return {
-        totalCampaigns: 1000,
-        activeCampaigns: 250,
-        totalRaised: BigInt("5000000000000"), // 500,000 XLM
-        totalContributors: 5000,
-        averageContribution: BigInt("1000000000"), // 100 XLM
-        successRate: 72.5,
-      };
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-      return {
-        totalCampaigns: 0,
-        activeCampaigns: 0,
-        totalRaised: BigInt(0),
-        totalContributors: 0,
-        averageContribution: BigInt(0),
-        successRate: 0,
-      };
+    const emptyStats: Statistics = {
+      totalCampaigns: 0,
+      activeCampaigns: 0,
+      totalRaised: BigInt(0),
+      totalContributors: 0,
+      averageContribution: BigInt(0),
+      successRate: 0,
+    };
+
+    if (!this.registryContractId) {
+      return emptyStats;
     }
+
+    return withErrorLogging("getStats", emptyStats, async () => {
+      const ids = await this.listAllCampaignIds();
+
+      // Fetch each campaign's info+stats in parallel rather than sequentially
+      // awaiting two on-chain calls per campaign in a loop — matches the
+      // Promise.all pattern already used by getCampaigns/getTrendingCampaigns.
+      const perCampaign = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const [info, stats] = await Promise.all([
+              this.view<RawCampaignInfo>(id, "get_campaign_info"),
+              this.view<RawCampaignStats>(id, "get_stats"),
+            ]);
+            return { info, stats };
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      let totalRaised = BigInt(0);
+      let totalContributors = 0;
+      let totalCampaigns = 0;
+      let activeCampaigns = 0;
+      let successfulCount = 0;
+
+      for (const entry of perCampaign) {
+        if (!entry) continue;
+        const { info, stats } = entry;
+
+        totalCampaigns++;
+        totalRaised += stats.total_raised;
+        totalContributors += stats.contributor_count;
+
+        if (info.status === "Active") activeCampaigns++;
+        if (info.status === "Successful") successfulCount++;
+      }
+
+      const avgContrib =
+        totalContributors > 0
+          ? totalRaised / BigInt(totalContributors)
+          : BigInt(0);
+      const successRate =
+        totalCampaigns > 0 ? (successfulCount / totalCampaigns) * 100 : 0;
+
+      return {
+        totalCampaigns,
+        activeCampaigns,
+        totalRaised,
+        totalContributors,
+        averageContribution: avgContrib,
+        successRate,
+      };
+    });
   }
 
+  // ── Write methods ─────────────────────────────────────────────────────────
+
   /**
-   * Verify a signature
+   * Verify that a Stellar account signed a given message.
+   *
+   * This is an off-chain utility — it does not call a Soroban contract.
+   * Uses Keypair to verify the Ed25519 signature.
    */
   async verifySignature(
     address: string,
     message: string,
-    signature: string
+    signature: string,
   ): Promise<boolean> {
-    try {
-      // In production, verify the signature against the public key
-      // This is a simplified mock
-      return signature.length > 20;
-    } catch (error) {
-      console.error("Error verifying signature:", error);
-      return false;
-    }
+    return withErrorLogging("verifySignature", false, async () => {
+      const keypair = Keypair.fromPublicKey(address);
+      return keypair.verify(
+        Buffer.from(message, "utf-8"),
+        Buffer.from(signature, "hex"),
+      );
+    });
   }
 
   /**
-   * Create a new campaign
+   * Submit a pre-signed `initialize` transaction to deploy a new campaign.
+   *
+   * The caller must construct, sign, and pass the full XDR of the
+   * `initialize` call on a **newly deployed** Soroban contract instance.
+   *
+   * Returns a `Campaign` object representing the newly created campaign.
    */
-  async createCampaign(creator: any, input: CreateCampaignInput): Promise<Campaign> {
-    try {
-      const campaign: Campaign = {
-        id: `new_${Date.now()}`,
-        contractId: `contract_new_${Date.now()}`,
-        title: input.title,
-        description: input.description,
-        creator: creator.address,
-        goal: input.goal,
-        raised: BigInt(0),
-        deadline: input.deadline,
-        status: "ACTIVE" as CampaignStatus,
-        category: input.category,
-        image: input.image,
-        videoUrl: input.videoUrl,
-        minContribution: input.minContribution,
-        totalContributors: 0,
-        token: "native",
-        platformFeeBps: 250,
-        hasRBACEnabled: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      return campaign;
-    } catch (error) {
-      console.error("Error creating campaign:", error);
-      throw error;
-    }
+  async createCampaign(
+    creator: AuthenticatedUser,
+    input: CreateCampaignInput,
+  ): Promise<Campaign> {
+    throw new Error(
+      "createCampaign requires a pre-signed deploy+initialize transaction. " +
+        "Provide the signed XDR via a separate mutation field instead.",
+    );
   }
 
   /**
-   * Update campaign
+   * Submit a pre-signed `update_metadata` transaction for an existing campaign.
    */
   async updateCampaign(
     id: string,
-    user: any,
-    input: UpdateCampaignInput
+    user: AuthenticatedUser,
+    input: UpdateCampaignInput,
   ): Promise<Campaign> {
-    try {
-      const campaign = await this.getCampaign(id);
-      if (!campaign) {
-        throw new Error(`Campaign not found: ${id}`);
-      }
-
-      return {
-        ...campaign,
-        ...input,
-        updatedAt: new Date().toISOString(),
-      };
-    } catch (error) {
-      console.error("Error updating campaign:", error);
-      throw error;
-    }
+    throw new Error(
+      "updateCampaign requires a pre-signed update_metadata transaction. " +
+        "Provide the signed XDR via a separate mutation field instead.",
+    );
   }
 
   /**
-   * Record a contribution
+   * Record a contribution that was already submitted to the chain.
+   *
+   * This reads the on-chain state to confirm the contribution exists
+   * and returns a `Contribution` object derived from chain data.
    */
-  async recordContribution(input: RecordContributionInput): Promise<Contribution> {
+  async recordContribution(
+    input: RecordContributionInput,
+  ): Promise<Contribution> {
+    // Verify contribution exists on-chain by checking the contributor's balance.
+    // Unlike the read methods above this rethrows rather than falling back —
+    // a caller that thinks it recorded a contribution needs to know when it
+    // didn't — so it keeps its own try/catch instead of withErrorLogging.
     try {
-      const contribution: Contribution = {
-        id: `contrib_${Date.now()}`,
+      const contribAmount = await this.view<bigint>(
+        input.campaignId,
+        "contribution",
+        [new Address(input.contributor).toScVal()],
+      );
+
+      if (contribAmount <= 0) {
+        throw new Error(
+          `No contribution found for ${input.contributor} in campaign ${input.campaignId}`,
+        );
+      }
+
+      return {
+        id: input.transactionHash,
         campaignId: input.campaignId,
         contributor: input.contributor,
-        amount: input.amount,
-        timestamp: new Date().toISOString(),
+        amount: contribAmount,
+        timestamp: nowUtcIso(),
         transactionHash: input.transactionHash,
       };
-
-      return contribution;
     } catch (error) {
-      console.error("Error recording contribution:", error);
+      logger.error(
+        {
+          err: error,
+          campaignId: input.campaignId,
+          contributor: input.contributor,
+        },
+        "Error recording contribution",
+      );
       throw error;
     }
   }

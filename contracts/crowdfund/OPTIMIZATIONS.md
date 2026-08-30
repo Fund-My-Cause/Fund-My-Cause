@@ -1,5 +1,25 @@
 # Gas Optimization & Event Documentation
 
+## WASM Size Budget
+
+The release profile in the workspace root is intentionally optimized for a small wasm payload:
+
+- `opt-level = "z"`
+- `lto = true`
+- `codegen-units = 1`
+- `strip = "symbols"`
+- `panic = "abort"`
+
+For the crowdfund contract, the practical size budget is 256 KiB for the release artifact in CI. This keeps deployment costs predictable on Stellar while preserving the full security and upgrade surface.
+
+Local verification:
+
+```bash
+python scripts/check_wasm_size.py --artifact target/wasm32-unknown-unknown/release/crowdfund.wasm --budget 262144
+```
+
+A build that exceeds the threshold should be treated as a size regression and investigated before deployment.
+
 ## Storage Optimization Techniques
 
 ### 1. Batch Instance Reads (contribute, withdraw, refund_single, refund_batch)
@@ -64,6 +84,39 @@ reused for all transfers.
 
 `LargestContribution` and `ContributorCount` are only written when the value actually
 changes, avoiding unnecessary storage writes.
+
+### 8. Hoist `KEY_PLATFORM`, `KEY_GROSS_TOTAL`, `KEY_INSURANCE`, `MatchingConfig` into Upfront Batch (contribute)
+
+**Before:** Four instance-storage reads occurred after the token transfer:
+- `inst.get(&KEY_GROSS_TOTAL)` — read inside the fee tracking block
+- `inst.get::<_, PlatformConfig>(&KEY_PLATFORM)` — re-fetched inside the fee block
+- `inst.get::<_, InsuranceConfig>(&KEY_INSURANCE)` — re-fetched inside the insurance block
+- `inst.get::<_, MatchingConfig>(&DataKey::MatchingConfig)` — re-fetched inside the matching block
+
+**After:** All four reads are hoisted into the single upfront batch alongside the existing
+reads (`KEY_STATUS`, `KEY_MIN`, etc.), giving a single contiguous ledger-entry access
+before any branching or token operations.
+
+```rust
+// Before — scattered mid-function reads
+let gross_total: i128 = inst.get(&KEY_GROSS_TOTAL).unwrap_or(0);            // after transfer
+if let Some(ref config) = inst.get::<_, PlatformConfig>(&KEY_PLATFORM) {…}  // after transfer
+let insurance_fee = inst.get::<_, InsuranceConfig>(&KEY_INSURANCE)…;        // after fee calc
+if let Some(config) = inst.get::<_, MatchingConfig>(&DataKey::MatchingConfig) {…} // later
+
+// After — all reads in the upfront batch
+let platform_config: Option<PlatformConfig>  = inst.get(&KEY_PLATFORM);
+let gross_total: i128                        = inst.get(&KEY_GROSS_TOTAL).unwrap_or(0);
+let insurance_config: Option<InsuranceConfig> = inst.get(&KEY_INSURANCE);
+let matching_config: Option<MatchingConfig>  = inst.get(&DataKey::MatchingConfig);
+```
+
+**Gas impact:** Eliminates 4 redundant instance-storage handle dereferences that
+previously occurred post-transfer. On Soroban, each `storage().instance()` read incurs
+a ledger-entry access overhead; batching them together amortises this cost.
+
+**Benchmark:** `contribute_with_platform_fee` was added to `contract_benchmarks.rs`
+to exercise and document the before/after on the `OnContribution` fee path.
 
 ---
 

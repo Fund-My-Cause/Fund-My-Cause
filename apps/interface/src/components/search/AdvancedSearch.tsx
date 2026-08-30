@@ -1,13 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, X, SlidersHorizontal, Sparkles } from "lucide-react";
-import { CATEGORY_TAXONOMY } from "@/lib/categories";
+import { useState } from "react";
+import { Search, X, SlidersHorizontal } from "lucide-react";
 import { SearchSuggestions } from "@/components/ui/SearchSuggestions";
 import { SavedSearchManager } from "@/components/search/SavedSearchManager";
 import type { SearchFilters } from "@/services/search.service";
 import type { SearchSuggestion } from "@/hooks/useSearchSuggestions";
 import type { SavedSearch } from "@/services/savedSearch.service";
+import { Select } from "@fund-my-cause/components";
+import { FORM_FIELD_CLS, FORM_SELECT_CLS_INLINE } from "@/lib/formStyles";
+import { AdvancedFilterPanel } from "./AdvancedFilterPanel";
+import {
+  SearchCategoryAndStatusTabs,
+  FILTER_TABS,
+} from "./SearchCategoryAndStatusTabs";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,19 +59,6 @@ const SORT_OPTIONS = [
   { label: "Trending", value: "trending" },
 ];
 
-const FILTER_TABS = [
-  { label: "All", value: "all" },
-  { label: "Active", value: "active" },
-  { label: "Funded", value: "funded" },
-  { label: "Ended", value: "ended" },
-];
-
-const selectCls =
-  "bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500";
-
-const inputCls =
-  "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500";
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function AdvancedSearch({
@@ -92,24 +85,6 @@ export function AdvancedSearch({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Local controlled state for advanced filter inputs (applied on "Apply")
-  const [goalMin, setGoalMin] = useState(
-    filters.goalMin !== undefined ? String(filters.goalMin) : "",
-  );
-  const [goalMax, setGoalMax] = useState(
-    filters.goalMax !== undefined ? String(filters.goalMax) : "",
-  );
-  const [dateFrom, setDateFrom] = useState(filters.dateFrom ?? "");
-  const [dateTo, setDateTo] = useState(filters.dateTo ?? "");
-
-  // Keep local advanced inputs in sync when URL changes externally
-  useEffect(() => {
-    setGoalMin(filters.goalMin !== undefined ? String(filters.goalMin) : "");
-    setGoalMax(filters.goalMax !== undefined ? String(filters.goalMax) : "");
-    setDateFrom(filters.dateFrom ?? "");
-    setDateTo(filters.dateTo ?? "");
-  }, [filters.goalMin, filters.goalMax, filters.dateFrom, filters.dateTo]);
-
   const hasQuery = inputValue.trim().length > 0;
   const hasAdvancedFilters = !!(
     filters.goalMin !== undefined ||
@@ -123,19 +98,6 @@ export function AdvancedSearch({
     onInputChange(s.title);
     setDropdownOpen(false);
     setActiveIndex(-1);
-  }
-
-  function handleApply() {
-    onApplyAdvanced({ goalMin, goalMax, dateFrom, dateTo });
-    onToggleAdvanced();
-  }
-
-  function handleClearAdvanced() {
-    setGoalMin("");
-    setGoalMax("");
-    setDateFrom("");
-    setDateTo("");
-    onClearAdvanced();
   }
 
   return (
@@ -207,18 +169,15 @@ export function AdvancedSearch({
         </div>
 
         {/* Sort selector */}
-        <select
+        <Select
+          unstyled
+          className={FORM_SELECT_CLS_INLINE}
+          fieldClassName={FORM_FIELD_CLS}
           value={filters.sort ?? "recent"}
           onChange={(e) => onFilterChange("sort", e.target.value)}
           aria-label="Sort campaigns"
-          className={selectCls}
-        >
-          {SORT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          options={SORT_OPTIONS}
+        />
 
         {/* Mobile filters toggle */}
         <button
@@ -283,7 +242,9 @@ export function AdvancedSearch({
       {/* ── Mobile filters panel ──────────────────────────────────────────── */}
       {showMobileFilters && (
         <div className="rounded-2xl border border-gray-700 bg-gray-900 p-5 space-y-4 sm:hidden">
-          <h3 className="text-sm font-semibold text-gray-300">Filter by Status</h3>
+          <h3 className="text-sm font-semibold text-gray-300">
+            Filter by Status
+          </h3>
           <div className="flex flex-col gap-2">
             {FILTER_TABS.map((tab) => (
               <button
@@ -307,89 +268,20 @@ export function AdvancedSearch({
 
       {/* ── Advanced filter panel ─────────────────────────────────────────── */}
       {showAdvanced && (
-        <div className="rounded-2xl border border-gray-700 bg-gray-900 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-300">
-              Advanced Filters
-            </h3>
-            <span className="flex items-center gap-1 text-xs text-indigo-400">
-              <Sparkles size={12} />
-              Semantic search active
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">
-                Min Goal (XLM)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={goalMin}
-                onChange={(e) => setGoalMin(e.target.value)}
-                placeholder="e.g. 1000"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">
-                Max Goal (XLM)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={goalMax}
-                onChange={(e) => setGoalMax(e.target.value)}
-                placeholder="e.g. 50000"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">
-                Deadline From
-              </label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">
-                Deadline To
-              </label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={handleClearAdvanced}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-400 hover:text-white transition"
-            >
-              <X size={12} /> Clear
-            </button>
-            <button
-              onClick={handleApply}
-              className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-medium text-white transition"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
+        <AdvancedFilterPanel
+          filters={filters}
+          onApplyAdvanced={onApplyAdvanced}
+          onClearAdvanced={onClearAdvanced}
+          onToggleAdvanced={onToggleAdvanced}
+        />
       )}
 
       {/* ── Saved searches panel ─────────────────────────────────────────── */}
       {onSaveSearch && (
         <div className="rounded-2xl border border-gray-700 bg-gray-900 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-300">Saved Searches</h3>
+          <h3 className="mb-3 text-sm font-semibold text-gray-300">
+            Saved Searches
+          </h3>
           <SavedSearchManager
             savedSearches={savedSearches}
             onRestore={onRestoreSearch ?? (() => {})}
@@ -401,92 +293,10 @@ export function AdvancedSearch({
         </div>
       )}
 
-      {/* ── Category pills ────────────────────────────────────────────────── */}
-      <div
-        className="flex flex-wrap gap-2"
-        role="group"
-        aria-label="Filter by category"
-      >
-        <button
-          onClick={() => onFilterChange("category", "")}
-          className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-            !filters.category
-              ? "bg-indigo-600 text-white"
-              : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          }`}
-        >
-          All
-        </button>
-        {CATEGORY_TAXONOMY.map((cat) => (
-          <button
-            key={cat.slug}
-            onClick={() =>
-              onFilterChange(
-                "category",
-                filters.category === cat.slug ? "" : cat.slug,
-              )
-            }
-            className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-              filters.category === cat.slug
-                ? "bg-indigo-600 text-white"
-                : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            }`}
-          >
-            {cat.emoji} {cat.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Status tabs ───────────────────────────────────────────────────── */}
-      <div
-        className="flex flex-wrap gap-2"
-        role="tablist"
-        aria-label="Filter by status"
-      >
-        {FILTER_TABS.map((tab, idx) => {
-          const isSelected =
-            currentStatus === tab.value ||
-            (!filters.status && tab.value === "all");
-          return (
-            <button
-              key={tab.value}
-              role="tab"
-              aria-selected={isSelected}
-              tabIndex={isSelected ? 0 : -1}
-              onClick={() => onFilterChange("filter", tab.value)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowRight") {
-                  const next = FILTER_TABS[(idx + 1) % FILTER_TABS.length];
-                  onFilterChange("filter", next.value);
-                  (
-                    e.currentTarget.parentElement?.children[
-                      (idx + 1) % FILTER_TABS.length
-                    ] as HTMLElement
-                  )?.focus();
-                } else if (e.key === "ArrowLeft") {
-                  const prev =
-                    FILTER_TABS[
-                      (idx - 1 + FILTER_TABS.length) % FILTER_TABS.length
-                    ];
-                  onFilterChange("filter", prev.value);
-                  (
-                    e.currentTarget.parentElement?.children[
-                      (idx - 1 + FILTER_TABS.length) % FILTER_TABS.length
-                    ] as HTMLElement
-                  )?.focus();
-                }
-              }}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                isSelected
-                  ? "bg-indigo-600 text-white"
-                  : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <SearchCategoryAndStatusTabs
+        filters={filters}
+        onFilterChange={onFilterChange}
+      />
     </div>
   );
 }

@@ -3,11 +3,17 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const isDev = process.env.NODE_ENV === "development";
 
+// CDN origin for image delivery (optional — leave unset to serve from origin)
+const IMAGE_CDN_URL = process.env.NEXT_PUBLIC_IMAGE_CDN_URL ?? "";
+
 /**
  * Content Security Policy for standard app routes.
  *
  * default-src 'self'          — baseline: only same-origin resources allowed
- * script-src  'self' + eval  — 'unsafe-eval' required by Next.js HMR in dev
+ * script-src  'self' + eval + inline (dev only) — 'unsafe-eval' and
+ *   'unsafe-inline' are required by Turbopack's dev-mode HMR bootstrap
+ *   inline scripts; without 'unsafe-inline' the CSP blocks hydration
+ *   entirely (self.__next_r never gets set → hydration invariant crash)
  * style-src   'self' 'unsafe-inline' — Tailwind injects inline styles
  * connect-src 'self' + RPC   — Soroban RPC, Horizon, CoinGecko price feed
  * img-src     'self' data:   — data URIs; Unsplash & IPFS for campaign images
@@ -17,7 +23,9 @@ const isDev = process.env.NODE_ENV === "development";
  */
 const cspDefault = [
   "default-src 'self'",
-  isDev ? "script-src 'self' 'unsafe-eval'" : "script-src 'self'",
+  isDev
+    ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
+    : "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   [
     "connect-src 'self'",
@@ -25,7 +33,14 @@ const cspDefault = [
     "https://horizon-testnet.stellar.org",
     "https://api.coingecko.com",
   ].join(" "),
-  "img-src 'self' data: https://images.unsplash.com https://ipfs.io",
+  [
+    "img-src 'self' data:",
+    "https://images.unsplash.com",
+    "https://ipfs.io",
+    IMAGE_CDN_URL || null,
+  ]
+    .filter(Boolean)
+    .join(" "),
   "font-src 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
@@ -38,7 +53,9 @@ const cspDefault = [
  */
 const cspEmbed = [
   "default-src 'self'",
-  isDev ? "script-src 'self' 'unsafe-eval'" : "script-src 'self'",
+  isDev
+    ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
+    : "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   [
     "connect-src 'self'",
@@ -46,7 +63,14 @@ const cspEmbed = [
     "https://horizon-testnet.stellar.org",
     "https://api.coingecko.com",
   ].join(" "),
-  "img-src 'self' data: https://images.unsplash.com https://ipfs.io",
+  [
+    "img-src 'self' data:",
+    "https://images.unsplash.com",
+    "https://ipfs.io",
+    IMAGE_CDN_URL || null,
+  ]
+    .filter(Boolean)
+    .join(" "),
   "font-src 'self'",
   "frame-ancestors *",
   "object-src 'none'",
@@ -55,12 +79,38 @@ const cspEmbed = [
 const nextConfig: NextConfig = {
   output: "standalone",
 
+  // Workspace packages are published from TypeScript source (no dist), so Next
+  // has to compile them alongside the app.
+  transpilePackages: [
+    "@fund-my-cause/components",
+    "@fund-my-cause/shared-utils",
+    "@fund-my-cause/types",
+  ],
+
   images: {
+    // Serve AVIF first (best compression), fall back to WebP, then original.
+    formats: ["image/avif", "image/webp"],
+    // Breakpoints used to generate responsive srcset variants.
+    // Aligned with RESPONSIVE_WIDTHS in imageOptimization.ts.
+    deviceSizes: [320, 480, 640, 750, 1080, 1200, 1920],
+    // Sizes for fixed-layout images (e.g. thumbnails, avatars).
+    imageSizes: [16, 32, 48, 56, 64, 96, 128, 256],
+    // Minimum cache TTL for optimised images — 30 days at the edge.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "**.ipfs.io" },
       { protocol: "https", hostname: "ipfs.io" },
       { protocol: "https", hostname: "cloudflare-ipfs.com" },
+      // Allow the configured CDN origin so next/image can serve through it.
+      ...(IMAGE_CDN_URL
+        ? [
+            {
+              protocol: "https" as const,
+              hostname: new URL(IMAGE_CDN_URL).hostname,
+            },
+          ]
+        : []),
     ],
   },
 
@@ -145,7 +195,8 @@ const nextConfig: NextConfig = {
       },
       // ── Static assets (images, fonts, etc.) — long-lived cache ──────────────
       {
-        source: "/:all*(svg|png|jpg|jpeg|gif|ico|webp|woff2?|ttf|eot|css|js)",
+        source:
+          "/:all*(svg|png|jpg|jpeg|gif|ico|webp|avif|woff2?|ttf|eot|css|js)",
         headers: [
           {
             key: "Cache-Control",
