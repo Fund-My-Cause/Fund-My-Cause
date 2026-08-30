@@ -6,6 +6,10 @@ import { CacheService } from "./services/cache.js";
 import { ContractService } from "./services/contract.js";
 import { PubSubService } from "./services/pubsub.js";
 import { notifyContribution } from "./services/fraud-client.js";
+import {
+  buildConnection,
+  resolvePaginationArgs,
+} from "@fund-my-cause/shared-utils";
 
 /**
  * Maps the public GraphQL schema's SCREAMING_CASE enum names (schema.ts)
@@ -75,10 +79,18 @@ export const resolvers: IResolvers<any, Context> = {
 
     async campaigns(
       _,
-      { filter, pagination = { limit: 20, offset: 0 }, sort },
+      { filter, pagination = {}, sort },
       context: Context
     ) {
-      const cacheKey = `campaigns:${JSON.stringify({ filter, pagination, sort })}`;
+      // Resolve pagination args through shared utility (handles defaults,
+      // clamping, and cursor → offset decoding in one place).
+      const { limit, offset } = resolvePaginationArgs({
+        limit: pagination.limit ?? 20,
+        offset: pagination.offset ?? 0,
+        after: pagination.after,
+      });
+
+      const cacheKey = `campaigns:${JSON.stringify({ filter, limit, offset, sort })}`;
       const cached = await context.cache.get(cacheKey);
 
       if (cached) {
@@ -87,25 +99,14 @@ export const resolvers: IResolvers<any, Context> = {
 
       const campaigns = await context.contractService.getCampaigns({
         filter,
-        pagination,
+        pagination: { limit, offset },
         sort,
       });
 
-      const edges = campaigns.map((campaign: Campaign, index: number) => ({
-        node: campaign,
-        cursor: Buffer.from(`${pagination.offset + index}`).toString("base64"),
-      }));
+      const totalCount = await context.contractService.getCampaignCount(filter);
 
-      const result = {
-        edges,
-        pageInfo: {
-          hasNextPage: edges.length === pagination.limit,
-          hasPreviousPage: pagination.offset > 0,
-          startCursor: edges[0]?.cursor,
-          endCursor: edges[edges.length - 1]?.cursor,
-        },
-        totalCount: await context.contractService.getCampaignCount(filter),
-      };
+      // buildConnection encodes cursors and computes pageInfo from shared logic.
+      const result = buildConnection(campaigns, offset, limit, totalCount);
 
       await context.cache.set(cacheKey, result, 600); // Cache for 10 minutes
       return result;

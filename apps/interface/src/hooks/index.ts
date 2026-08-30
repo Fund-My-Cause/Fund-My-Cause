@@ -3,6 +3,12 @@ export { useLocalStorage } from "./useLocalStorage";
 export { useDebounce } from "./useDebounce";
 export { useAsync } from "./useAsync";
 export type { AsyncStatus, AsyncState, UseAsyncReturn } from "./useAsync";
+export { useInfiniteList } from "./useInfiniteList";
+export type {
+  UseInfiniteListOptions,
+  UseInfiniteListReturn,
+  InfiniteListPage,
+} from "./useInfiniteList";
 
 // Domain hooks
 export {
