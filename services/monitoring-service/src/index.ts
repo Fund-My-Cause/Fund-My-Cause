@@ -1,6 +1,8 @@
 import express, { Express, Request, Response } from 'express';
 import { IncidentResponseEngine } from './incident-response';
 import { PagerDutyIntegration } from './pagerduty-integration';
+import { buildAlertTransportFromEnv } from './alert-transport';
+import { AlertRuleEvaluator, AlertmanagerWebhookPayload } from './alert-rule';
 import { register, Counter, Histogram, Gauge } from 'prom-client';
 
 const app: Express = express();
@@ -12,6 +14,12 @@ app.use(express.json());
 // Initialize services
 const incidentEngine = new IncidentResponseEngine();
 const pagerDuty = new PagerDutyIntegration(process.env.PAGERDUTY_API_KEY || 'test-key');
+
+// Alert pipeline – real transport built from env vars, rule evaluator wired to it.
+// No MockTransport is used; if no channels are configured, notifications are
+// logged only (buildAlertTransportFromEnv emits a startup warning).
+const alertTransport = buildAlertTransportFromEnv();
+const alertRuleEvaluator = new AlertRuleEvaluator(alertTransport);
 
 // Metrics
 const incidentCounter = new Counter({
@@ -216,18 +224,68 @@ app.get('/incidents', (req: Request, res: Response) => {
 });
 
 /**
- * 5. POST /alerts - Create alert
+ * 5. POST /alerts - Alertmanager webhook receiver
+ *
+ * Accepts the Alertmanager webhook payload, evaluates alert rules, and
+ * delivers notifications over the configured transport channels.
+ * This is the entry point wired from alertmanager.yml webhook_configs.
  */
-app.post('/alerts', (req: Request, res: Response) => {
+app.post('/alerts', async (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
+    // Support both bare single-alert objects (legacy) and the full
+    // Alertmanager webhook envelope (preferred).
+    const body = req.body as Record<string, unknown>;
+
+    let webhookPayload: AlertmanagerWebhookPayload;
+
+    if (Array.isArray(body['alerts'])) {
+      // Full Alertmanager webhook envelope
+      webhookPayload = body as unknown as AlertmanagerWebhookPayload;
+    } else {
+      // Wrap a bare alert into a minimal envelope so the evaluator can
+      // handle both call shapes transparently.
+      webhookPayload = {
+        version: '4',
+        groupKey: `bare|${Date.now()}`,
+        status: (body['status'] as 'firing' | 'resolved') || 'firing',
+        receiver: 'monitoring-service',
+        groupLabels: {},
+        commonLabels: (body['labels'] as Record<string, string>) || {},
+        commonAnnotations: (body['annotations'] as Record<string, string>) || {},
+        externalURL: '',
+        alerts: [
+          {
+            status: (body['status'] as 'firing' | 'resolved') || 'firing',
+            labels: (body['labels'] as Record<string, string>) || {},
+            annotations: (body['annotations'] as Record<string, string>) || {},
+            startsAt: (body['startsAt'] as string) || new Date().toISOString(),
+          },
+        ],
+      };
+    }
+
+    // Evaluate rules and deliver notifications.
+    const evaluationResults = await alertRuleEvaluator.evaluate(webhookPayload);
+
+    const firedRules = evaluationResults.filter((r) => r.fired);
+    const failedDeliveries = evaluationResults.filter((r) => r.fired && r.error);
+
+    firedRules.forEach((r) => {
+      alertCounter.labels(r.payload?.severity ?? 'unknown').inc();
+    });
+
+    if (failedDeliveries.length > 0) {
+      console.error('[POST /alerts] Some notification deliveries failed:', failedDeliveries);
+    }
+
     const alert = {
       id: `alert-${Date.now()}`,
       ...req.body,
       created_at: new Date().toISOString(),
+      rules_evaluated: evaluationResults.length,
+      rules_fired: firedRules.length,
     };
-
-    alertCounter.labels(alert.severity).inc();
 
     responseTimeHistogram.labels('/alerts', 'POST').observe((Date.now() - startTime) / 1000);
     res.status(201).json(alert);
@@ -318,12 +376,12 @@ app.get('/health', (req: Request, res: Response) => {
 /**
  * 9. POST /analyze - Performance analysis
  */
-app.post('/analyze', (req: Request, res: Response) => {
+app.post('/analyze', async (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const { metric, threshold, window } = req.body;
 
-    const analysis = incidentEngine.analyzeMetric(metric, threshold, window);
+    const analysis = await incidentEngine.analyzeMetricAsync(metric, threshold, window);
 
     responseTimeHistogram.labels('/analyze', 'POST').observe((Date.now() - startTime) / 1000);
     res.json(analysis);
