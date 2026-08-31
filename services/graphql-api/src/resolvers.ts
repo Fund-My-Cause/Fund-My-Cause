@@ -1,13 +1,28 @@
 import { GraphQLError } from "graphql";
 import type { IResolvers } from "@graphql-tools/utils";
-import { CAMPAIGN_STATUS_VALUES, type CampaignStatus, validateCampaignInput, validateDonationAmount, XLM_TO_STROOPS } from "@fund-my-cause/types";
+import {
+  CAMPAIGN_STATUS_VALUES,
+  type CampaignStatus,
+  validateDonationAmount,
+  XLM_TO_STROOPS,
+} from "@fund-my-cause/types";
 import type { Context, Campaign } from "./types.js";
 import { CacheService } from "./services/cache.js";
 import { ContractService } from "./services/contract.js";
 import { PubSubService } from "./services/pubsub.js";
 import { notifyContribution } from "./services/fraud-client.js";
 import type { MutationName } from "./services/rate-limiter.js";
-import { buildPage, decodeCursor, CursorError } from "./services/cursor-pagination.js";
+import {
+  buildPage,
+  decodeCursor,
+  CursorError,
+} from "./services/cursor-pagination.js";
+import {
+  validateCreateCampaignInput,
+  validateRecordContributionInput,
+  validateUpdateCampaignInput,
+  validateAuthenticateInput,
+} from "./middleware/validation.js";
 
 /**
  * Maps the public GraphQL schema's SCREAMING_CASE enum names (schema.ts)
@@ -17,9 +32,10 @@ import { buildPage, decodeCursor, CursorError } from "./services/cursor-paginati
  * instead of silently drifting out of sync — this is the contract test
  * that guards against the bug this resolver map exists to fix.
  */
-export const CAMPAIGN_STATUS_ENUM_MAP: Record<string, CampaignStatus> = Object.fromEntries(
-  CAMPAIGN_STATUS_VALUES.map((value) => [value.toUpperCase(), value])
-);
+export const CAMPAIGN_STATUS_ENUM_MAP: Record<string, CampaignStatus> =
+  Object.fromEntries(
+    CAMPAIGN_STATUS_VALUES.map((value) => [value.toUpperCase(), value]),
+  );
 
 // ---------------------------------------------------------------------------
 // Mutation rate-limit helper (#899)
@@ -37,7 +53,7 @@ export const CAMPAIGN_STATUS_ENUM_MAP: Record<string, CampaignStatus> = Object.f
  */
 async function enforceMutationRateLimit(
   mutation: MutationName,
-  context: Context
+  context: Context,
 ): Promise<void> {
   const rateLimiter = (context as any).rateLimiter;
   if (!rateLimiter) return; // not present in test stubs — skip
@@ -48,7 +64,8 @@ async function enforceMutationRateLimit(
   } catch (error: any) {
     const retryAfter: number = error.retryAfter ?? 60;
     throw new GraphQLError(
-      error.message ?? `Rate limit exceeded for mutation '${mutation}'. Retry after ${retryAfter}s.`,
+      error.message ??
+        `Rate limit exceeded for mutation '${mutation}'. Retry after ${retryAfter}s.`,
       {
         extensions: {
           code: "TOO_MANY_REQUESTS",
@@ -56,7 +73,7 @@ async function enforceMutationRateLimit(
           retryAfter,
           mutation,
         },
-      }
+      },
     );
   }
 }
@@ -80,22 +97,6 @@ export const resolvers: IResolvers<any, Context> = {
     },
   },
 
-  DateTime: {
-    serialize(value: Date | string) {
-      if (typeof value === "string") return value;
-      return value.toISOString();
-    },
-    parseValue(value: string) {
-      return new Date(value).toISOString();
-    },
-    parseLiteral(ast: any) {
-      if (ast.kind === "StringValue") {
-        return new Date(ast.value).toISOString();
-      }
-      throw new GraphQLError(`Cannot coerce value: ${ast}`);
-    },
-  },
-
   // Query resolvers
   Query: {
     async campaign(_, { id }, context: Context) {
@@ -108,7 +109,9 @@ export const resolvers: IResolvers<any, Context> = {
 
       const campaign = await context.contractService.getCampaign(id);
       if (!campaign) {
-        throw new GraphQLError(`Campaign not found: ${id}`);
+        throw new GraphQLError(`Campaign not found: ${id}`, {
+          extensions: { code: "NOT_FOUND" },
+        });
       }
 
       await context.cache.set(cacheKey, campaign, 300); // Cache for 5 minutes
@@ -118,7 +121,7 @@ export const resolvers: IResolvers<any, Context> = {
     async campaigns(
       _,
       { filter, first, after, pagination = { limit: 20, offset: 0 }, sort },
-      context: Context
+      context: Context,
     ) {
       // ---------------------------------------------------------------------------
       // Resolve effective page size and offset.
@@ -141,9 +144,12 @@ export const resolvers: IResolvers<any, Context> = {
           afterId = decoded.id;
         } catch (err) {
           if (err instanceof CursorError) {
-            throw new GraphQLError(`Invalid pagination cursor: ${err.message}`, {
-              extensions: { code: "BAD_USER_INPUT" },
-            });
+            throw new GraphQLError(
+              `Invalid pagination cursor: ${err.message}`,
+              {
+                extensions: { code: "BAD_USER_INPUT" },
+              },
+            );
           }
           throw err;
         }
@@ -191,8 +197,48 @@ export const resolvers: IResolvers<any, Context> = {
       return result;
     },
 
-    async activeCampaigns(_, { limit = 20 }, context: Context) {
-      return context.dataLoader.campaignsByStatus.load({ status: "Active", limit });
+    async activeCampaigns(_, { first, after, limit = 20 }, context: Context) {
+      const pageSize = first ?? limit ?? 20;
+      const clampedSize = Math.max(1, Math.min(pageSize, 100));
+
+      let afterSortKey: string | undefined;
+      let afterId: string | undefined;
+      if (after) {
+        try {
+          const decoded = decodeCursor(after);
+          afterSortKey = decoded.sortKey;
+          afterId = decoded.id;
+        } catch (err) {
+          if (err instanceof CursorError) {
+            throw new GraphQLError(
+              `Invalid pagination cursor: ${err.message}`,
+              {
+                extensions: { code: "BAD_USER_INPUT" },
+              },
+            );
+          }
+          throw err;
+        }
+      }
+
+      const campaigns = await context.dataLoader.campaignsByStatus.load({
+        status: "Active",
+        limit: clampedSize + 1,
+        afterSortKey,
+        afterId,
+      });
+
+      const hasNextPage = campaigns.length > clampedSize;
+      const hasPreviousPage = !!after;
+      const pageItems: Campaign[] = campaigns.slice(0, clampedSize);
+
+      return buildPage(
+        pageItems,
+        (c) => c.id,
+        (c) => c.createdAt,
+        hasNextPage,
+        hasPreviousPage,
+      );
     },
 
     async trendingCampaigns(_, { limit = 10 }, context: Context) {
@@ -203,7 +249,8 @@ export const resolvers: IResolvers<any, Context> = {
         return cached;
       }
 
-      const campaigns = await context.contractService.getTrendingCampaigns(limit);
+      const campaigns =
+        await context.contractService.getTrendingCampaigns(limit);
       await context.cache.set(cacheKey, campaigns, 1800); // Cache for 30 minutes
       return campaigns;
     },
@@ -216,7 +263,9 @@ export const resolvers: IResolvers<any, Context> = {
       const campaign = await context.dataLoader.campaigns.load(id);
 
       if (!campaign) {
-        throw new GraphQLError(`Campaign not found: ${id}`);
+        throw new GraphQLError(`Campaign not found: ${id}`, {
+          extensions: { code: "NOT_FOUND" },
+        });
       }
 
       const [contributors, updates, milestones] = await Promise.all([
@@ -237,16 +286,69 @@ export const resolvers: IResolvers<any, Context> = {
       return context.dataLoader.contributions.load(id);
     },
 
-    async contributions(_, { campaignId, contributor }, context: Context) {
+    async contributions(
+      _,
+      { campaignId, contributor, first, after },
+      context: Context,
+    ) {
+      const pageSize = first ?? 20;
+      const clampedSize = Math.max(1, Math.min(pageSize, 100));
+
+      let afterSortKey: string | undefined;
+      let afterId: string | undefined;
+      if (after) {
+        try {
+          const decoded = decodeCursor(after);
+          afterSortKey = decoded.sortKey;
+          afterId = decoded.id;
+        } catch (err) {
+          if (err instanceof CursorError) {
+            throw new GraphQLError(
+              `Invalid pagination cursor: ${err.message}`,
+              {
+                extensions: { code: "BAD_USER_INPUT" },
+              },
+            );
+          }
+          throw err;
+        }
+      }
+
+      let items: any[] = [];
       if (campaignId) {
-        return context.dataLoader.campaignContributions.load(campaignId);
+        const allContributions =
+          await context.dataLoader.campaignContributions.load(campaignId);
+        items = allContributions || [];
+      } else if (contributor) {
+        const allContributions =
+          await context.dataLoader.userContributions.load(contributor);
+        items = allContributions || [];
+      } else {
+        throw new GraphQLError(
+          "Either campaignId or contributor must be provided",
+        );
       }
 
-      if (contributor) {
-        return context.dataLoader.userContributions.load(contributor);
+      // Filter by afterSortKey if provided
+      let filteredItems = items;
+      if (afterSortKey && afterId) {
+        const afterIndex = items.findIndex((c) => c.id === afterId);
+        if (afterIndex !== -1) {
+          filteredItems = items.slice(afterIndex + 1);
+        }
       }
 
-      throw new GraphQLError("Either campaignId or contributor must be provided");
+      const hasNextPage = filteredItems.length > clampedSize;
+      const hasPreviousPage = !!after;
+      const pageItems = filteredItems.slice(0, clampedSize);
+
+      return buildPage(
+        pageItems,
+        (c) => c.id,
+        (c) => c.timestamp || new Date().toISOString(),
+        hasNextPage,
+        hasPreviousPage,
+      );
     },
 
     async user(_, { address }, context: Context) {
@@ -259,7 +361,9 @@ export const resolvers: IResolvers<any, Context> = {
 
       const user = await context.contractService.getUser(address);
       if (!user) {
-        throw new GraphQLError(`User not found: ${address}`);
+        throw new GraphQLError(`User not found: ${address}`, {
+          extensions: { code: "NOT_FOUND" },
+        });
       }
 
       await context.cache.set(cacheKey, user, 600); // Cache for 10 minutes
@@ -309,8 +413,7 @@ export const resolvers: IResolvers<any, Context> = {
           address: contributor.address,
           amount: contributor.amount,
           percentage: Number(
-            (contributor.amount * 100n) /
-              parent.campaign.raised
+            (contributor.amount * 100n) / parent.campaign.raised,
           ),
         }));
     },
@@ -318,12 +421,102 @@ export const resolvers: IResolvers<any, Context> = {
 
   // User field resolvers
   User: {
-    async campaigns(user, _, context: Context) {
-      return context.dataLoader.userCampaigns.load(user.address);
+    async campaigns(user, { first, after }, context: Context) {
+      const pageSize = first ?? 20;
+      const clampedSize = Math.max(1, Math.min(pageSize, 100));
+
+      let afterSortKey: string | undefined;
+      let afterId: string | undefined;
+      if (after) {
+        try {
+          const decoded = decodeCursor(after);
+          afterSortKey = decoded.sortKey;
+          afterId = decoded.id;
+        } catch (err) {
+          if (err instanceof CursorError) {
+            throw new GraphQLError(
+              `Invalid pagination cursor: ${err.message}`,
+              {
+                extensions: { code: "BAD_USER_INPUT" },
+              },
+            );
+          }
+          throw err;
+        }
+      }
+
+      const allCampaigns = await context.dataLoader.userCampaigns.load(
+        user.address,
+      );
+      let items = allCampaigns || [];
+
+      if (afterSortKey && afterId) {
+        const afterIndex = items.findIndex((c) => c.id === afterId);
+        if (afterIndex !== -1) {
+          items = items.slice(afterIndex + 1);
+        }
+      }
+
+      const hasNextPage = items.length > clampedSize;
+      const hasPreviousPage = !!after;
+      const pageItems = items.slice(0, clampedSize);
+
+      return buildPage(
+        pageItems,
+        (c) => c.id,
+        (c) => c.createdAt,
+        hasNextPage,
+        hasPreviousPage,
+      );
     },
 
-    async contributions(user, _, context: Context) {
-      return context.dataLoader.userContributions.load(user.address);
+    async contributions(user, { first, after }, context: Context) {
+      const pageSize = first ?? 20;
+      const clampedSize = Math.max(1, Math.min(pageSize, 100));
+
+      let afterSortKey: string | undefined;
+      let afterId: string | undefined;
+      if (after) {
+        try {
+          const decoded = decodeCursor(after);
+          afterSortKey = decoded.sortKey;
+          afterId = decoded.id;
+        } catch (err) {
+          if (err instanceof CursorError) {
+            throw new GraphQLError(
+              `Invalid pagination cursor: ${err.message}`,
+              {
+                extensions: { code: "BAD_USER_INPUT" },
+              },
+            );
+          }
+          throw err;
+        }
+      }
+
+      const allContributions = await context.dataLoader.userContributions.load(
+        user.address,
+      );
+      let items = allContributions || [];
+
+      if (afterSortKey && afterId) {
+        const afterIndex = items.findIndex((c) => c.id === afterId);
+        if (afterIndex !== -1) {
+          items = items.slice(afterIndex + 1);
+        }
+      }
+
+      const hasNextPage = items.length > clampedSize;
+      const hasPreviousPage = !!after;
+      const pageItems = items.slice(0, clampedSize);
+
+      return buildPage(
+        pageItems,
+        (c) => c.id,
+        (c) => c.timestamp || new Date().toISOString(),
+        hasNextPage,
+        hasPreviousPage,
+      );
     },
   },
 
@@ -383,10 +576,13 @@ export const resolvers: IResolvers<any, Context> = {
   // Mutation resolvers
   Mutation: {
     async authenticate(_, { signature, message, address }, context: Context) {
+      // Validate input
+      validateAuthenticateInput({ signature, message, address });
+
       const verified = await context.contractService.verifySignature(
         address,
         message,
-        signature
+        signature,
       );
 
       if (!verified) {
@@ -407,30 +603,20 @@ export const resolvers: IResolvers<any, Context> = {
         throw new GraphQLError("Authentication required");
       }
 
+      // Validate input using middleware
+      validateCreateCampaignInput(input);
+
       // Rate-limit: 5 campaign creations per wallet per hour (#899)
       await enforceMutationRateLimit("createCampaign", context);
 
-      const validationErrors = validateCampaignInput({
-        title: input.title,
-        description: input.description,
-        goal: input.goal?.toString() ?? "",
-        deadline: input.deadline,
-        minContribution: input.minContribution?.toString() ?? "",
-      });
-      if (Object.keys(validationErrors).length > 0) {
-        throw new GraphQLError("Invalid campaign input", {
-          extensions: { code: "BAD_USER_INPUT", validationErrors },
-        });
-      }
-
       const campaign = await context.contractService.createCampaign(
         context.user,
-        input
+        input,
       );
 
       // Invalidate cache
-      await context.cache.del("campaigns:*");
-      await context.cache.del("trending:*");
+      await context.cache.delPattern("campaigns:*");
+      await context.cache.delPattern("trending:*");
 
       return campaign;
     },
@@ -440,15 +626,19 @@ export const resolvers: IResolvers<any, Context> = {
         throw new GraphQLError("Authentication required");
       }
 
+      // Validate input using middleware
+      validateUpdateCampaignInput(input);
+
       const campaign = await context.contractService.updateCampaign(
         id,
         context.user,
-        input
+        input,
       );
 
       // Invalidate cache
       await context.cache.del(`campaign:${id}`);
-      await context.cache.del("campaigns:*");
+      await context.cache.delPattern("campaigns:*");
+      await context.cache.delPattern("trending:*");
 
       // Publish update
       await context.pubsub.publish(`campaign_updated:${id}`, campaign);
@@ -461,18 +651,11 @@ export const resolvers: IResolvers<any, Context> = {
         throw new GraphQLError("Authentication required");
       }
 
+      // Validate input using middleware
+      validateRecordContributionInput(input);
+
       // Rate-limit: 20 contributions per wallet per 10 minutes (#899)
       await enforceMutationRateLimit("recordContribution", context);
-
-      const amountXlm = input.amount
-        ? (Number(input.amount) / Number(XLM_TO_STROOPS)).toString()
-        : "0";
-      const amountError = validateDonationAmount(amountXlm);
-      if (amountError) {
-        throw new GraphQLError(amountError, {
-          extensions: { code: "BAD_USER_INPUT" },
-        });
-      }
 
       const { traceId, log } = context;
 
@@ -486,7 +669,8 @@ export const resolvers: IResolvers<any, Context> = {
         "recordContribution: started",
       );
 
-      const contribution = await context.contractService.recordContribution(input);
+      const contribution =
+        await context.contractService.recordContribution(input);
 
       log.info(
         { contributionId: contribution.id, campaignId: input.campaignId },
@@ -512,6 +696,11 @@ export const resolvers: IResolvers<any, Context> = {
       await context.cache.del(`campaign:${input.campaignId}`);
       await context.cache.del("platform:stats");
       await context.cache.del(`user:${input.contributor}`);
+      // A new contribution changes each campaign's `raised` total, which is
+      // embedded in cached list/trending payloads — those must be busted too
+      // or campaign lists show stale progress after every contribution.
+      await context.cache.delPattern("campaigns:*");
+      await context.cache.delPattern("trending:*");
 
       // Publish events
       await context.pubsub.publish(

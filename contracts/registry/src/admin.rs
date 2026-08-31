@@ -7,7 +7,8 @@
 //! - Fee configuration
 //! - Emergency controls
 
-use soroban_sdk::{Address, Env, String};
+use common::{AccessControl, EVENT_SCHEMA_VERSION};
+use soroban_sdk::{Address, Env, String, Vec};
 use common::CommonError;
 
 // ================================================================
@@ -201,6 +202,38 @@ impl AdminLogic {
             .get(&key)
             .ok_or(CommonError::NotInitialized)
     }
+
+    /// Update campaign status (admin only)
+    pub fn update_campaign_status(
+        env: &Env,
+        campaign_id: Address,
+        new_status: CampaignStatus,
+    ) -> Result<(), CommonError> {
+        let admin = Self::get_admin(env)?;
+        admin.require_auth();
+
+        // Guard: campaign must already be registered globally
+        let campaigns: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&String::from_str(env, "campaigns"))
+            .unwrap_or_else(|| Vec::new(env));
+        if !campaigns.contains(&campaign_id) {
+            return Err(CommonError::NotFound);
+        }
+
+        // Get current status and update
+        let status_key = String::from_str(env, &format!("campaign_status_{}", campaign_id.to_string()));
+        let old_status: CampaignStatus = env.storage().get(&status_key).unwrap_or(CampaignStatus::Pending);
+        env.storage().set(&status_key, &new_status);
+
+        env.events().publish(
+            ("campaign_status_updated", "v1"),
+            (campaign_id, old_status, new_status),
+        );
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -263,5 +296,34 @@ mod tests {
         let result = AdminLogic::transfer_admin(&env, attacker, new_admin);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), CommonError::Unauthorized);
+    }
+
+    #[test]
+    fn test_pause() {
+        let env = Env::default();
+        let admin = Address::random(&env);
+        let fee_recipient = Address::random(&env);
+
+        AdminLogic::initialize(&env, admin.clone(), 100, fee_recipient).unwrap();
+
+        let result = AdminLogic::pause(&env, admin.clone());
+        assert!(result.is_ok());
+
+        assert!(AdminLogic::is_paused(&env));
+    }
+
+    #[test]
+    fn test_unpause() {
+        let env = Env::default();
+        let admin = Address::random(&env);
+        let fee_recipient = Address::random(&env);
+
+        AdminLogic::initialize(&env, admin.clone(), 100, fee_recipient).unwrap();
+
+        AdminLogic::pause(&env, admin.clone()).unwrap();
+        let result = AdminLogic::unpause(&env, admin);
+        assert!(result.is_ok());
+
+        assert!(!AdminLogic::is_paused(&env));
     }
 }

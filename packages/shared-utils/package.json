@@ -21,6 +21,10 @@
     "./timestamps": {
       "import": "./src/timestamps.ts",
       "types": "./src/timestamps.ts"
+    },
+    "./auth": {
+      "import": "./src/auth.ts",
+      "types": "./src/auth.ts"
     }
   },
   "scripts": {
@@ -29,10 +33,13 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@fund-my-cause/types": "file:../types"
+    "@fund-my-cause/types": "file:../types",
+    "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "20.19.37",
+    "@vitest/coverage-v8": "^4.1.2",
     "typescript": "5.9.3",
     "vitest": "4.1.2"
   }

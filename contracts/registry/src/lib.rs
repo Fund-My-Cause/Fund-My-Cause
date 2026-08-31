@@ -4,6 +4,10 @@
 //! Entrypoints are wired to business logic in `admin.rs` and `lookup.rs`.
 
 #![no_std]
+// The SDK deprecated `Events::publish` in favour of the `#[contractevent]` macro.
+// Migrating changes how events are encoded on the wire, so it is a behaviour change
+// for every off-chain consumer, not a lint cleanup, and is tracked separately.
+#![allow(deprecated)]
 
 mod admin;
 mod lookup;
