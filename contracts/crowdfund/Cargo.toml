@@ -2,33 +2,15 @@
 name = "crowdfund"
 version = "0.1.0"
 edition = "2021"
-publish = false
-description = "Fund-My-Cause crowdfunding smart contract for the Stellar/Soroban network"
-documentation = "https://fund-my-cause.github.io/Fund-My-Cause/crowdfund"
-readme = "../../README.md"
-license = "MIT"
+
+[dependencies]
+soroban-sdk = { version = "21.0.0", default-features = false }
+
+[dev-dependencies]
+soroban-sdk = { version = "21.0.0", features = ["testutils"] }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-doctest = false
-
-# docs.rs configuration — enables all features and sets rustdoc flags
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = [
-  "--cfg", "docsrs",
-  "--document-private-items",
-  "--default-theme=ayu",
-]
 
 [features]
-fuzz = []
-
-[dependencies]
-soroban-sdk = { workspace = true }
-common = { path = "../common" }
-
-[dev-dependencies]
-soroban-sdk = { workspace = true, features = ["testutils"] }
-insta = { workspace = true }
-proptest = "1.4"
+testutils = ["soroban-sdk/testutils"]
