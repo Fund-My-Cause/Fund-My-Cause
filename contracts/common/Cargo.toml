@@ -2,16 +2,12 @@
 name = "common"
 version = "0.1.0"
 edition = "2021"
-publish = false
-description = "Shared access-control (RBAC) and error-handling primitives for Fund-My-Cause Soroban contracts"
-readme = "README.md"
-license = "MIT"
-
-[lib]
-doctest = false
 
 [dependencies]
-soroban-sdk = { workspace = true }
+soroban-sdk = { workspace = true, default-features = false }
 
-[dev-dependencies]
-soroban-sdk = { workspace = true, features = ["testutils"] }
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+testutils = ["soroban-sdk/testutils"]
