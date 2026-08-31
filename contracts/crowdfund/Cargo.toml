@@ -4,13 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-soroban-sdk = { version = "21.0.0", default-features = false }
+soroban-sdk = { workspace = true }
+common = { path = "../common" }
 
 [dev-dependencies]
-soroban-sdk = { version = "21.0.0", features = ["testutils"] }
+soroban-sdk = { workspace = true, features = ["testutils"] }
+common = { path = "../common", features = ["testutils"] }
+proptest = "1.4"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [features]
 testutils = ["soroban-sdk/testutils"]
+fuzz = []

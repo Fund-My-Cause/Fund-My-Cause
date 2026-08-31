@@ -33,7 +33,9 @@ pub(crate) fn setup(
     };
     let key = DataKey::RecurringPlan(contributor.clone());
     env.storage().persistent().set(&key, &plan);
-    env.storage().persistent().extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
     env.events().publish(
         ("campaign", "recurring_setup"),
@@ -67,7 +69,7 @@ pub(crate) fn execute(env: &Env, contributor: Address) -> Result<(), ContractErr
     let token: Address = inst.get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;
     token::Client::new(env, &token).transfer(
         &contributor,
-        &env.current_contract_address(),
+        env.current_contract_address(),
         &plan.amount,
     );
 
