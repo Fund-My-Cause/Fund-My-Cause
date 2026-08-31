@@ -3,17 +3,16 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { GitCompare } from "lucide-react";
+import { Bookmark, GitCompare, Share2 } from "lucide-react";
 import {
-  CampaignActions,
   CampaignHeader,
+  CampaignHeaderActions,
   CampaignProgress,
 } from "@fund-my-cause/components";
 import {
-  calculateProgress,
   formatXlmWithUsd,
+  calculateProgress,
   isCampaignEnded,
-  isCampaignFunded,
 } from "@fund-my-cause/shared-utils";
 import { cn } from "@/lib/utils";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -24,11 +23,12 @@ import { useBookmarks } from "@/context/BookmarkContext";
 import { getCategoryBySlug } from "@/lib/categories";
 import { getFallbackImage, isValidImageUri } from "@/lib/imageValidation";
 import { SIZES_CARD_THUMB } from "@/lib/imageOptimization";
-import {
-  calculateCampaignProgress,
-  calculateIsEnded,
-} from "@/lib/campaignProgress";
 import { useTranslations } from "next-intl";
+import {
+  Highlight,
+  StatusBadge,
+  CategoryBadge,
+} from "./campaign/CampaignCardBadges";
 
 export interface CampaignCardProps {
   campaign: Campaign;
@@ -42,66 +42,6 @@ export interface CampaignCardProps {
   query?: string;
 }
 
-function Highlight({ text, query }: { text: string; query?: string }) {
-  if (!query) return <>{text}</>;
-  const regex = new RegExp(
-    `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-    "gi",
-  );
-  const parts = text.split(regex);
-  return (
-    <>
-      {parts.map((part, i) =>
-        regex.test(part) ? (
-          <mark
-            key={i}
-            className="bg-yellow-200 dark:bg-yellow-700 text-inherit rounded px-0.5"
-          >
-            {part}
-          </mark>
-        ) : (
-          part
-        ),
-      )}
-    </>
-  );
-}
-
-function StatusBadge({
-  status,
-  label,
-}: {
-  status: "funded" | "ended";
-  label: string;
-}) {
-  const icon = status === "funded" ? "✓" : "⏰";
-  return (
-    <span
-      className={cn(
-        "absolute top-3 left-3 px-2 py-0.5 rounded-full text-xs font-semibold",
-        status === "funded"
-          ? "bg-[var(--color-success)]/90 text-white"
-          : "bg-[var(--color-surface-elevated)]/90 text-[var(--color-text-secondary)]",
-      )}
-    >
-      <span aria-hidden="true" className="mr-1">
-        {icon}
-      </span>
-      {label}
-    </span>
-  );
-}
-
-function CategoryBadge({ slug }: { slug?: string }) {
-  const cat = getCategoryBySlug(slug);
-  if (!cat) return null;
-  return (
-    <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-black/60 text-white backdrop-blur-sm">
-      {cat.emoji} {cat.label}
-    </span>
-  );
-}
-
 const ICON_BUTTON_CLS =
   "p-2 rounded-full bg-[var(--color-surface)]/80 hover:bg-[var(--color-surface-elevated)] transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center";
 
@@ -113,7 +53,7 @@ const ICON_BUTTON_CLS =
  * from `@fund-my-cause/components`. Progress maths and amount formatting come
  * from `@fund-my-cause/shared-utils` — nothing is computed inline here.
  */
-export function CampaignCard({
+function CampaignCardComponent({
   campaign,
   onPledge,
   onShare,
@@ -123,22 +63,22 @@ export function CampaignCard({
 }: CampaignCardProps) {
   const t = useTranslations("campaignCard");
   const progress = React.useMemo(
-    () => calculateCampaignProgress(campaign.raised, campaign.goal),
+    () => calculateProgress(campaign.raised, campaign.goal),
     [campaign.raised, campaign.goal],
   );
   const isFunded = progress >= 100;
   const isEnded = React.useMemo(
-    () => calculateIsEnded(campaign.deadline, isFunded),
-    [campaign.deadline, isFunded],
+    () => isCampaignEnded(campaign.deadline, campaign.raised, campaign.goal),
+    [campaign.deadline, campaign.raised, campaign.goal],
   );
   const isDisabled = isFunded || isEnded;
 
-  // Resolve image: use campaign.image if valid, otherwise deterministic fallback
   const fallbackSrc = getFallbackImage(campaign.id);
-  const [imgSrc, setImgSrc] = React.useState<string>(
-    isValidImageUri(campaign.image) ? campaign.image : fallbackSrc,
-  );
-  const isDisabled = isFunded || isEnded;
+  // Fallback image resolution: track whether the image failed to load so
+  // CampaignHeader's renderImage callback can fall back gracefully.
+  const [imgError, setImgError] = React.useState(false);
+  const resolvedImageUrl =
+    !imgError && isValidImageUri(campaign.image) ? campaign.image : undefined;
 
   const { toggle: toggleCompare, isSelected, selected } = useComparison();
   const { toggle: toggleBookmark, isBookmarked } = useBookmarks();
@@ -167,8 +107,8 @@ export function CampaignCard({
         title={campaign.title}
         description={<Highlight text={campaign.description} query={query} />}
         renderTitle={(title) => <Highlight text={title} query={query} />}
-        imageUrl={isValidImageUri(campaign.image) ? campaign.image : undefined}
-        fallbackImageUrl={getFallbackImage(campaign.id)}
+        imageUrl={resolvedImageUrl}
+        fallbackImageUrl={fallbackSrc}
         imageAlt={`${campaign.title} - campaign header image`}
         renderImage={({ src, alt, onError }) => (
           <Image
@@ -177,7 +117,10 @@ export function CampaignCard({
             fill
             className="object-cover"
             sizes={SIZES_CARD_THUMB}
-            onError={onError}
+            onError={() => {
+              setImgError(true);
+              onError?.();
+            }}
           />
         )}
         classNames={{
@@ -198,7 +141,7 @@ export function CampaignCard({
               </span>
             )}
             <CategoryBadge slug={campaign.category} />
-            <CampaignActions
+            <CampaignHeaderActions
               unstyled
               layout="inline"
               className="absolute top-10 right-3 flex gap-1"
@@ -216,30 +159,37 @@ export function CampaignCard({
                 savedIcon:
                   "fill-[var(--color-brand)] text-[var(--color-brand)]",
               }}
-              aria-label={t("shareCampaign")}
-              className="p-2 rounded-full bg-[var(--color-surface)]/80 hover:bg-[var(--color-surface-elevated)] transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
-              <Share2 size={15} className="text-[var(--color-text-muted)]" />
-            </button>
-          )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleBookmark(campaign.id);
-            }}
-            aria-label={
-              bookmarked ? t("removeBookmark") : t("bookmarkCampaign")
-            }
-            className="p-2 rounded-full bg-[var(--color-surface)]/80 hover:bg-[var(--color-surface-elevated)] transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-          >
-            <Bookmark
-              size={15}
-              className={cn(
-                bookmarked
-                  ? "fill-[var(--color-brand)] text-[var(--color-brand)]"
-                  : "text-[var(--color-text-muted)]",
-              )}
-            />
+              <button
+                aria-label={t("shareCampaign")}
+                className={ICON_BUTTON_CLS}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShare?.(campaign.id, campaign.title);
+                }}
+              >
+                <Share2 size={15} className="text-[var(--color-text-muted)]" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleBookmark(campaign.id);
+                }}
+                aria-label={
+                  bookmarked ? t("removeBookmark") : t("bookmarkCampaign")
+                }
+                className={ICON_BUTTON_CLS}
+              >
+                <Bookmark
+                  size={15}
+                  className={cn(
+                    bookmarked
+                      ? "fill-[var(--color-brand)] text-[var(--color-brand)]"
+                      : "text-[var(--color-text-muted)]",
+                  )}
+                />
+              </button>
+            </CampaignHeaderActions>
           </>
         }
       >
@@ -255,24 +205,6 @@ export function CampaignCard({
               "flex justify-between text-sm text-[var(--color-text-secondary)]",
           }}
         />
-
-      <div className="p-4 sm:p-5 space-y-3">
-        <h2 className="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">
-          <Highlight text={campaign.title} query={query} />
-        </h2>
-        <p className="text-[var(--color-text-secondary)] text-sm line-clamp-2">
-          <Highlight text={campaign.description} query={query} />
-        </p>
-        <ProgressBar progress={progress} />
-        <div className="flex justify-between text-sm text-[var(--color-text-secondary)]">
-          <span>
-            {formatXlm(campaign.raised, xlmPrice)} {t("raised")}
-          </span>
-          <span>
-            {formatXlm(campaign.goal, xlmPrice)} {t("goal")}
-          </span>
-        </div>
-        <CountdownTimer deadline={campaign.deadline} />
         <label
           className={cn(
             "flex items-center gap-2 text-xs cursor-pointer select-none touch-manipulation",
@@ -293,37 +225,14 @@ export function CampaignCard({
           className="ds-btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
           onClick={() => onPledge?.(campaign.id)}
           disabled={isDisabled}
-          aria-label={
-            isFunded
-              ? t("successfullyFunded")
-              : isEnded
-                ? t("campaignEnded")
-                : t("pledgeNow")
-          }
-          classNames={{
-            donate:
-              "ds-btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation",
-          }}
+          aria-label={pledgeAriaLabel}
         >
-          <label
-            className={cn(
-              "flex items-center gap-2 text-xs cursor-pointer select-none touch-manipulation",
-              compareDisabled && "opacity-40 cursor-not-allowed",
-            )}
-          >
-            <input
-              type="checkbox"
-              checked={compared}
-              disabled={compareDisabled}
-              onChange={() => toggleCompare(campaign.id)}
-              className="accent-[var(--color-brand)] w-4 h-4"
-            />
-            <GitCompare size={12} className="text-[var(--color-text-muted)]" />
-            <span className="text-[var(--color-text-muted)]">
-              {t("compare")}
-            </span>
-          </label>
-        </CampaignActions>
+          {isFunded
+            ? t("successfullyFunded")
+            : isEnded
+              ? t("campaignEnded")
+              : t("pledgeNow")}
+        </button>
       </CampaignHeader>
     </motion.div>
   );
