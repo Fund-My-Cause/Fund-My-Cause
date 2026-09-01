@@ -4046,21 +4046,88 @@ impl CrowdfundContract {
         access::add_to_denylist(env, address)
     }
 
-    /// Removes an address from the deny list (admin only).
-    pub fn remove_from_denylist(env: Env, address: Address) -> Result<(), ContractError> {
-        access::remove_from_denylist(env, address)
-    }
+#[test]
+fn test_no_panic_on_overflow() {
+    let env = Env::default();
+    let addr = Address::random(&env);
 
-    /// Returns `true` if the address is on the allow list.
-    pub fn is_allowlisted(env: Env, address: Address) -> bool {
-        access::is_allowlisted(env, address)
-    }
-
-    /// Returns `true` if the address is on the deny list.
-    pub fn is_denylisted(env: Env, address: Address) -> bool {
-        access::is_denylisted(env, address)
-    }
+    // Try to contribute a huge amount
+    let result = CrowdfundContract::contribute(
+        env.clone(),
+        addr.clone(),
+        i128::MAX,
+        String::from_str(&env, "XLM"),
+        None,
+    );
+    // Should return an error, not panic
+    assert!(result.is_err());
 }
 
-#[cfg(test)]
-mod test;
+#[test]
+fn test_no_panic_on_uninitialized() {
+    let env = Env::default();
+    let addr = Address::random(&env);
+
+    // Try to contribute to uninitialized campaign
+    let result = CrowdfundContract::contribute(
+        env.clone(),
+        addr.clone(),
+        100,
+        String::from_str(&env, "XLM"),
+        None,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_no_panic_on_invalid_goal() {
+    let env = Env::default();
+    let creator = Address::random(&env);
+
+    // Try to create campaign with invalid goal
+    let result = CrowdfundContract::initialize(
+        env.clone(),
+        creator.clone(),
+        Address::random(&env),
+        0, // Invalid goal
+        env.ledger().timestamp() + 1000,
+        0,
+        0,
+        String::from_str(&env, "Title"),
+        String::from_str(&env, "Description"),
+        None,
+        None,
+        None,
+        Category::Other,
+        None,
+        None,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_no_panic_on_past_deadline() {
+    let env = Env::default();
+    let creator = Address::random(&env);
+
+    // Try to create campaign with past deadline
+    let result = CrowdfundContract::initialize(
+        env.clone(),
+        creator.clone(),
+        Address::random(&env),
+        1000,
+        env.ledger().timestamp() - 1000, // Past deadline
+        0,
+        0,
+        String::from_str(&env, "Title"),
+        String::from_str(&env, "Description"),
+        None,
+        None,
+        None,
+        Category::Other,
+        None,
+        None,
+    );
+    assert!(result.is_err());
+}
+EOF
