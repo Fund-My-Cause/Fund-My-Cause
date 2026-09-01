@@ -11,18 +11,10 @@ import { CacheService } from "./services/cache.js";
 import { ContractService } from "./services/contract.js";
 import { PubSubService } from "./services/pubsub.js";
 import { notifyContribution } from "./services/fraud-client.js";
-import type { MutationName } from "./services/rate-limiter.js";
 import {
-  buildPage,
-  decodeCursor,
-  CursorError,
-} from "./services/cursor-pagination.js";
-import {
-  validateCreateCampaignInput,
-  validateRecordContributionInput,
-  validateUpdateCampaignInput,
-  validateAuthenticateInput,
-} from "./middleware/validation.js";
+  buildConnection,
+  resolvePaginationArgs,
+} from "@fund-my-cause/shared-utils";
 
 /**
  * Maps the public GraphQL schema's SCREAMING_CASE enum names (schema.ts)
@@ -120,45 +112,18 @@ export const resolvers: IResolvers<any, Context> = {
 
     async campaigns(
       _,
-      { filter, first, after, pagination = { limit: 20, offset: 0 }, sort },
-      context: Context,
+      { filter, pagination = {}, sort },
+      context: Context
     ) {
-      // ---------------------------------------------------------------------------
-      // Resolve effective page size and offset.
-      //
-      // Cursor args (first / after) take precedence over the legacy offset-based
-      // PaginationInput.  When a cursor is supplied we decode it to extract the
-      // last-seen sortKey so the database layer can apply a keyset filter.
-      // ---------------------------------------------------------------------------
-      const pageSize = first ?? pagination.limit ?? 20;
-      const clampedSize = Math.max(1, Math.min(pageSize, 100));
+      // Resolve pagination args through shared utility (handles defaults,
+      // clamping, and cursor → offset decoding in one place).
+      const { limit, offset } = resolvePaginationArgs({
+        limit: pagination.limit ?? 20,
+        offset: pagination.offset ?? 0,
+        after: pagination.after,
+      });
 
-      // Decode the `after` cursor if provided.  An invalid cursor is a client
-      // error — surface it as a BAD_USER_INPUT so the caller gets a clear message.
-      let afterSortKey: string | undefined;
-      let afterId: string | undefined;
-      if (after) {
-        try {
-          const decoded = decodeCursor(after);
-          afterSortKey = decoded.sortKey;
-          afterId = decoded.id;
-        } catch (err) {
-          if (err instanceof CursorError) {
-            throw new GraphQLError(
-              `Invalid pagination cursor: ${err.message}`,
-              {
-                extensions: { code: "BAD_USER_INPUT" },
-              },
-            );
-          }
-          throw err;
-        }
-      }
-
-      // Use offset from legacy input when no cursor is present.
-      const legacyOffset = after ? 0 : (pagination.offset ?? 0);
-
-      const cacheKey = `campaigns:${JSON.stringify({ filter, first: clampedSize, after, legacyOffset, sort })}`;
+      const cacheKey = `campaigns:${JSON.stringify({ filter, limit, offset, sort })}`;
       const cached = await context.cache.get(cacheKey);
 
       if (cached) {
@@ -169,29 +134,14 @@ export const resolvers: IResolvers<any, Context> = {
       // COUNT query.  This is the standard "fetch N+1" cursor-pagination trick.
       const campaigns = await context.contractService.getCampaigns({
         filter,
-        pagination: { limit: clampedSize + 1, offset: legacyOffset },
+        pagination: { limit, offset },
         sort,
       });
 
-      const hasNextPage = campaigns.length > clampedSize;
-      const hasPreviousPage = after ? true : legacyOffset > 0;
-      const pageItems: Campaign[] = campaigns.slice(0, clampedSize);
+      const totalCount = await context.contractService.getCampaignCount(filter);
 
-      // Build cursor-paginated response using the cursor-pagination service.
-      // Sort key is createdAt (ISO string) which gives stable ordering;
-      // the opaque id ties-breaks duplicate timestamps.
-      const pageResult = buildPage(
-        pageItems,
-        (c) => c.id,
-        (c) => c.createdAt,
-        hasNextPage,
-        hasPreviousPage,
-      );
-
-      const result = {
-        ...pageResult,
-        totalCount: await context.contractService.getCampaignCount(filter),
-      };
+      // buildConnection encodes cursors and computes pageInfo from shared logic.
+      const result = buildConnection(campaigns, offset, limit, totalCount);
 
       await context.cache.set(cacheKey, result, 600); // Cache for 10 minutes
       return result;

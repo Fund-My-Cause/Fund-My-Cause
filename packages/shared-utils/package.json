@@ -18,13 +18,9 @@
       "import": "./src/campaign.ts",
       "types": "./src/campaign.ts"
     },
-    "./timestamps": {
-      "import": "./src/timestamps.ts",
-      "types": "./src/timestamps.ts"
-    },
-    "./auth": {
-      "import": "./src/auth.ts",
-      "types": "./src/auth.ts"
+    "./pagination": {
+      "import": "./src/pagination.ts",
+      "types": "./src/pagination.ts"
     }
   },
   "scripts": {
