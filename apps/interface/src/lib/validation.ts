@@ -1,85 +1,56 @@
 /**
  * Input validation and sanitization utilities for campaign creation.
+ *
+ * Field-level validators (title, description, goal, deadline, minContribution,
+ * feeBps) are delegated to the shared @fund-my-cause/types package so the
+ * frontend and backend always apply identical rules.
+ *
+ * Interface-specific helpers (isValidContractId, validateContractId,
+ * sanitizeTitle, sanitizeDescription, validateVideoUrl,
+ * validateMaxContribution) remain here.
  */
 
-const MAX_TITLE_LENGTH = 100;
-const MAX_DESCRIPTION_LENGTH = 1000;
-const MAX_GOAL = BigInt(9223372036854775807) / BigInt(10); // i128::MAX / 10
-const MIN_DEADLINE_HOURS = 1;
-const MAX_DEADLINE_YEARS = 1;
+import {
+  validateCampaignTitle,
+  validateCampaignDescription,
+  validateCampaignGoal,
+  validateCampaignDeadline,
+  validateMinContribution as sharedValidateMinContribution,
+  validateFeeBps as sharedValidateFeeBps,
+} from "@fund-my-cause/types";
+import {
+  optionalXlmCapSchema,
+  firstSchemaError,
+} from "@/lib/validationSchemas";
+import { sanitizeText } from "@/lib/sanitize";
+
+// Re-export shared constants for callers that import them from this module.
+export {
+  CAMPAIGN_TITLE_MAX_LENGTH,
+  CAMPAIGN_DESCRIPTION_MAX_LENGTH,
+  CAMPAIGN_DEADLINE_MIN_HOURS,
+  CAMPAIGN_DEADLINE_MAX_YEARS,
+  DONATION_MIN_XLM,
+  XLM_TO_STROOPS,
+} from "@fund-my-cause/types";
+
+// ---------------------------------------------------------------------------
+// Interface-specific helpers (not shared)
+// ---------------------------------------------------------------------------
 
 /**
  * Validate that a string is a valid Stellar contract ID.
  * Contract IDs start with 'C', are 56 characters long, and use valid base32 characters.
- * @returns Error message if invalid, null if valid
  */
 export function isValidContractId(id: string): boolean {
   if (!id || typeof id !== "string") {
     return false;
   }
-  // Must start with 'C' and be exactly 56 characters
   if (!id.startsWith("C") || id.length !== 56) {
     return false;
   }
-  // Must contain only valid base32 characters (A-Z, 2-7)
   const base32Regex = /^C[A-Z2-7]{55}$/;
   return base32Regex.test(id);
-}
-
-/**
- * Strip HTML tags from a string.
- */
-export function stripHtmlTags(text: string): string {
-  return text.replace(/<[^>]*>/g, "");
-}
-
-/**
- * Validate and sanitize campaign title.
- * @returns Error message if invalid, null if valid
- */
-export function validateTitle(title: string): string | null {
-  if (!title || !title.trim()) {
-    return "Title is required.";
-  }
-  const sanitized = stripHtmlTags(title);
-  if (sanitized.length > MAX_TITLE_LENGTH) {
-    return `Title must be ${MAX_TITLE_LENGTH} characters or less.`;
-  }
-  return null;
-}
-
-/**
- * Validate and sanitize campaign description.
- * @returns Error message if invalid, null if valid
- */
-export function validateDescription(description: string): string | null {
-  if (!description || !description.trim()) {
-    return "Description is required.";
-  }
-  const sanitized = stripHtmlTags(description);
-  if (sanitized.length > MAX_DESCRIPTION_LENGTH) {
-    return `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less.`;
-  }
-  return null;
-}
-
-/**
- * Validate funding goal.
- * @returns Error message if invalid, null if valid
- */
-export function validateGoal(goal: string): string | null {
-  if (!goal || goal.trim() === "") {
-    return "Goal is required.";
-  }
-  const num = Number(goal);
-  if (isNaN(num) || num <= 0) {
-    return "Goal must be a positive number.";
-  }
-  const bigGoal = BigInt(Math.floor(num * 10_000_000)); // Convert to stroops
-  if (bigGoal > MAX_GOAL) {
-    return "Goal exceeds maximum allowed value.";
-  }
-  return null;
 }
 
 export function validateContractId(id: string): string | null {
@@ -111,26 +82,76 @@ export function validateVideoUrl(videoUrl: string): string | null {
 }
 
 /**
+ * Validate maximum contribution per contributor.
+ * A value of 0 means no limit. If set, must be >= minContribution.
+ * Use case: prevents whale dominance by capping any single contributor's total pledge.
+ * @returns Error message if invalid, null if valid
+ */
+export function validateMaxContribution(
+  maxContribution: string,
+  minContribution: string,
+): string | null {
+  const minNum = Number(minContribution);
+  const min = !isNaN(minNum) && minNum > 0 ? minNum : 0;
+
+  return firstSchemaError(
+    optionalXlmCapSchema(min, {
+      invalid: "Maximum contribution must be a non-negative number.",
+      belowMinimum:
+        "Maximum contribution cannot be less than minimum contribution.",
+    }),
+    maxContribution,
+  );
+}
+
+/**
+ * Sanitize title by stripping HTML tags (including script/style contents) and trimming.
+ */
+export function sanitizeTitle(title: string): string {
+  return sanitizeText(title).trim();
+}
+
+/**
+ * Sanitize description by stripping HTML tags (including script/style contents) and trimming.
+ */
+export function sanitizeDescription(description: string): string {
+  return sanitizeText(description).trim();
+}
+
+// ---------------------------------------------------------------------------
+// Delegated validators (backward-compatible wrappers around shared logic)
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate and sanitize campaign title.
+ * @returns Error message if invalid, null if valid
+ */
+export function validateTitle(title: string): string | null {
+  return validateCampaignTitle(title);
+}
+
+/**
+ * Validate and sanitize campaign description.
+ * @returns Error message if invalid, null if valid
+ */
+export function validateDescription(description: string): string | null {
+  return validateCampaignDescription(description);
+}
+
+/**
+ * Validate funding goal.
+ * @returns Error message if invalid, null if valid
+ */
+export function validateGoal(goal: string): string | null {
+  return validateCampaignGoal(goal);
+}
+
+/**
  * Validate deadline.
  * @returns Error message if invalid, null if valid
  */
 export function validateDeadline(deadline: string): string | null {
-  if (!deadline) {
-    return "Deadline is required.";
-  }
-  const deadlineDate = new Date(deadline);
-  const now = new Date();
-  const diffMs = deadlineDate.getTime() - now.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-  const diffYears = diffHours / (24 * 365);
-
-  if (diffHours < MIN_DEADLINE_HOURS) {
-    return `Deadline must be at least ${MIN_DEADLINE_HOURS} hour in the future.`;
-  }
-  if (diffYears > MAX_DEADLINE_YEARS) {
-    return `Deadline cannot be more than ${MAX_DEADLINE_YEARS} year in the future.`;
-  }
-  return null;
+  return validateCampaignDeadline(deadline);
 }
 
 /**
@@ -141,42 +162,7 @@ export function validateMinContribution(
   minContribution: string,
   goal: string,
 ): string | null {
-  if (!minContribution || minContribution.trim() === "") {
-    return "Minimum contribution is required.";
-  }
-  const num = Number(minContribution);
-  if (isNaN(num) || num < 1) {
-    return "Minimum contribution must be at least 1.";
-  }
-  const goalNum = Number(goal);
-  if (num > goalNum) {
-    return "Minimum contribution cannot exceed goal.";
-  }
-  return null;
-}
-
-/**
- * Validate maximum contribution per contributor.
- * A value of 0 means no limit. If set, must be >= minContribution.
- * Use case: prevents whale dominance by capping any single contributor's total pledge.
- * @returns Error message if invalid, null if valid
- */
-export function validateMaxContribution(
-  maxContribution: string,
-  minContribution: string,
-): string | null {
-  if (!maxContribution || maxContribution.trim() === "" || maxContribution === "0") {
-    return null; // 0 = no limit, optional field
-  }
-  const num = Number(maxContribution);
-  if (isNaN(num) || num < 0) {
-    return "Maximum contribution must be a non-negative number.";
-  }
-  const minNum = Number(minContribution);
-  if (!isNaN(minNum) && minNum > 0 && num < minNum) {
-    return "Maximum contribution cannot be less than minimum contribution.";
-  }
-  return null;
+  return sharedValidateMinContribution(minContribution, goal);
 }
 
 /**
@@ -184,26 +170,5 @@ export function validateMaxContribution(
  * @returns Error message if invalid, null if valid
  */
 export function validateFeeBps(feeBps: string): string | null {
-  if (!feeBps || feeBps.trim() === "") {
-    return null; // Optional field
-  }
-  const num = Number(feeBps);
-  if (isNaN(num) || num < 0 || num > 10000) {
-    return "Fee must be between 0 and 10000 basis points.";
-  }
-  return null;
-}
-
-/**
- * Sanitize title by stripping HTML tags and trimming.
- */
-export function sanitizeTitle(title: string): string {
-  return stripHtmlTags(title).trim();
-}
-
-/**
- * Sanitize description by stripping HTML tags and trimming.
- */
-export function sanitizeDescription(description: string): string {
-  return stripHtmlTags(description).trim();
+  return sharedValidateFeeBps(feeBps);
 }

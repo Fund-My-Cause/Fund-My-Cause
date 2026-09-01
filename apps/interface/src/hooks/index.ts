@@ -10,6 +10,9 @@ export type {
   InfiniteListPage,
 } from "./useInfiniteList";
 
+// Wallet hook — single source of wallet state for all components
+export { useWallet } from "./useWallet";
+
 // Domain hooks
 export {
   useCampaign,
@@ -24,7 +27,10 @@ export { useCampaignDraft } from "./useCampaignDraft";
 export type { CampaignDraftData, DraftSaveStatus } from "./useCampaignDraft";
 export { useXlmBalance } from "./useXlmBalance";
 export { useAccountExists } from "./useAccountExists";
-export { useRecommendations } from "./useRecommendations";
+export {
+  useSimilarCampaigns,
+  useRecommendedCampaigns,
+} from "./useRecommendations";
 export { useComments } from "./useComments";
 export { useBreakpoint } from "./useBreakpoint";
 export { useFocusTrap } from "./useFocusTrap";

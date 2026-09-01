@@ -9,6 +9,7 @@ Off-chain indexer service for Fund-My-Cause. Ingests Soroban contract events and
 ```bash
 SOROBAN_RPC_URL=https://soroban-testnet.stellar.org:443
 CROWDFUND_CONTRACT_ID=<your-contract-id>
+REGISTRY_CONTRACT_ID=<your-registry-contract-id>  # optional; see "Event Handlers" below
 PORT=3001
 LOG_LEVEL=info
 ```
@@ -100,10 +101,76 @@ Get overall service statistics.
 
 ## Architecture
 
-- **RPC Client**: Connects to Soroban RPC and streams contract events
+- **RPC Client**: Connects to Soroban RPC and streams contract events for every contract ID in `contractIds` (crowdfund + optionally registry)
+- **Event Dispatcher**: Groups a mixed batch of events by type and routes each group to its domain handler; unknown types fall back to the repository directly so no event is lost
+- **Event Handlers**: One class per (contract type, event type) pair, modularized under `src/handlers/<contractType>/` — see below
 - **Event Store**: In-memory event storage, the single live data-access layer for this service
 - **Health Checker**: Tracks service health and metrics
 - **Express Server**: REST API (`/events`, `/stats`, `/health`, `/ready`) for querying indexed data
+
+## Event Handlers (#1125)
+
+Handlers are grouped by the Soroban contract that emits their event type, so
+adding a new contract never requires touching an existing contract's handler
+code:
+
+```
+src/handlers/
+  types.ts                    # EventHandler interface + ContractType
+  dispatcher.ts                # contract-agnostic router (eventType -> handler)
+  crowdfund/                   # contracts/crowdfund events
+    campaign.handler.ts         # eventType: "campaign"
+    donation.handler.ts         # eventType: "donation" (alias: "Contribute")
+    achievement.handler.ts      # eventType: "achievement"
+  registry/                    # contracts/registry events
+    registered.handler.ts       # eventType: "registered"
+```
+
+Every handler implements the shared `EventHandler` interface (`eventType`,
+`contractType`, `handle()`) documented in `src/handlers/types.ts`. To add a
+new contract type: create `src/handlers/<contractType>/`, implement
+`EventHandler` for each of its event types, export the classes from
+`src/handlers/index.ts`, register instances in the `EventDispatcher` in
+`src/index.ts`, and add the contract's ID to the `contractIds` passed to
+`SorobanRPCClient`.
+
+## Connection Pool Configuration
+
+The indexer uses in-memory storage (via `EventStore`) rather than a SQL or NoSQL database, so there is no traditional connection pool to configure. Instead, `src/store-config.ts` exposes the analogous resource-capacity levers that bound memory and outbound RPC concurrency.
+
+### Settings
+
+| Environment variable | Default | Description |
+|---|---|---|
+| `STORE_MAX_EVENT_CAPACITY` | `100000` | Maximum events held in memory. Acts as the pool-size equivalent — bounds total RAM usage. Oldest events are evicted when the limit is reached. |
+| `STORE_EVENT_BATCH_SIZE` | `500` | Maximum events processed per ingestion batch. Analogous to a pool acquire timeout: limits per-cycle work. |
+| `STORE_STALE_LEDGER_THRESHOLD_MS` | `60000` | Milliseconds since the last ingested event before health is reported as degraded. |
+| `RPC_REQUEST_TIMEOUT_MS` | `30000` | Timeout in ms for each Soroban RPC request. Matches the recommended Soroban RPC timeout. |
+| `RPC_MAX_CONCURRENT_REQUESTS` | `5` | Maximum concurrent outbound RPC requests. Stellar testnet recommends ≤ 10 concurrent connections; 5 leaves headroom for other clients. |
+| `RPC_RETRY_ATTEMPTS` | `3` | Retry attempts on transient RPC failure before the request is considered failed. |
+
+### Design rationale
+
+These defaults are derived from observed testnet behaviour:
+
+- **Peak ingestion rate**: ~500 events/min on testnet → `STORE_MAX_EVENT_CAPACITY=100,000` keeps ~200 min of history in memory before eviction begins.
+- **`RPC_MAX_CONCURRENT_REQUESTS=5`**: prevents saturating the Stellar testnet RPC endpoint (recommended ceiling: 10 concurrent connections).
+- **`RPC_REQUEST_TIMEOUT_MS=30,000`**: aligns with the Soroban JSON-RPC documented timeout.
+
+All values are configurable via environment variables (see `.env.example`). The defaults are intentionally conservative; raise `STORE_MAX_EVENT_CAPACITY` if you need longer in-memory history and have sufficient RAM.
+
+### Future migration
+
+When a durable store (e.g. PostgreSQL, SQLite) is introduced, replace `src/store-config.ts` with the shared pool config from `@fund-my-cause/shared-utils` (`packages/shared-utils/src/db-config.ts`, #1128) — the single source of truth for pool tuning across every backend service:
+
+```typescript
+import { loadDbPoolConfig } from "@fund-my-cause/shared-utils";
+
+const dbPool = loadDbPoolConfig();
+// { max, min, idleTimeoutMillis, connectionTimeoutMillis, retryAttempts, retryBackoffMs }
+```
+
+The `StoreConfig` interface is designed to make this migration visible: a grep for `StoreConfig` will find every place the capacity and concurrency settings are consumed. See `docs/db-pool-conventions.md` for the full parameter reference and the equivalent Python loader used by `fraud_detection` and `recommendations`.
 
 ### Data-access decision (#837)
 
