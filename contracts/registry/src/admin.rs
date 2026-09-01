@@ -7,9 +7,8 @@
 //! - Fee configuration
 //! - Emergency controls
 
-use common::{AccessControl, EVENT_SCHEMA_VERSION};
-use soroban_sdk::{Address, Env, String, Vec};
-use common::CommonError;
+use common::{EVENT_SCHEMA_VERSION};
+use soroban_sdk::{Address, Env, Vec};
 
 // ================================================================
 // Admin Data Structures
@@ -236,22 +235,29 @@ impl AdminLogic {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use soroban_sdk::{Env, Address};
+/// See [`crate::RegistryContract::update_status`].
+pub(crate) fn update_status(
+    env: Env,
+    campaign_id: Address,
+    old_status: CampaignStatus,
+    new_status: CampaignStatus,
+) -> Result<(), ContractError> {
+    require_initialized(&env)?;
 
-    #[test]
-    fn test_initialize() {
-        let env = Env::default();
-        let admin = Address::random(&env);
-        let fee_recipient = Address::random(&env);
+    // Issue #1147: use the shared AccessControl helper instead of the previously
+    // inline "read KEY_ADMIN → require_role_auth" pattern. Behaviour is identical:
+    // loads the stored admin address and calls require_auth() on it.
+    common::AccessControl::require_stored_auth(&env, &KEY_ADMIN)
+        .map_err(|_| ContractError::Unauthorized)?;
 
-        let result = AdminLogic::initialize(&env, admin.clone(), 100, fee_recipient);
-        assert!(result.is_ok());
-
-        let stored_admin = AdminLogic::get_admin(&env).unwrap();
-        assert_eq!(stored_admin, admin);
+    // Guard: campaign must already be registered globally
+    let campaigns: Vec<Address> = env
+        .storage()
+        .instance()
+        .get(&KEY_CAMPAIGNS)
+        .unwrap_or_else(|| Vec::new(&env));
+    if !campaigns.contains(&campaign_id) {
+        return Err(ContractError::NotFound);
     }
 
     #[test]

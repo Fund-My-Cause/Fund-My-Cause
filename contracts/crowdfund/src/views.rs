@@ -380,9 +380,41 @@ pub(crate) fn get_vesting_info(env: Env) -> Option<VestingSchedule> {
 /// loading all three values in one pass with a single instance-footprint charge.
 /// The `now` timestamp is also read exactly once.
 pub(crate) fn get_vested_amount(env: Env) -> i128 {
-    let cache = CachedInstanceView::load(&env);
+    let inst = env.storage().instance();
+    let total: i128 = inst.get(&KEY_TOTAL).unwrap_or(0);
+    if total <= 0 {
+        return 0;
+    }
+
+    // Issue #1145: use checked_mul to prevent overflow on large totals
+    let platform_fee = inst
+        .get::<_, PlatformConfig>(&KEY_PLATFORM)
+        .map(|c| {
+            total
+                .checked_mul(c.fee_bps as i128)
+                .and_then(|v| v.checked_div(10_000))
+                .unwrap_or(0)
+        })
+        .unwrap_or(0);
+    let payout = total - platform_fee;
+
+    let vesting: Option<VestingSchedule> = inst.get(&KEY_VESTING);
+    let Some(v) = vesting else { return payout };
+
     let now = env.ledger().timestamp();
-    cache.vested_amount(now)
+    if now < v.cliff {
+        return 0;
+    }
+    if v.duration == 0 || now >= v.cliff + v.duration {
+        return payout;
+    }
+    let elapsed = now - v.cliff;
+    let duration = v.duration as i128;
+    // Issue #1145: use checked_mul to prevent overflow on large payout * elapsed
+    payout
+        .checked_mul(elapsed as i128)
+        .and_then(|product| product.checked_div(duration))
+        .unwrap_or(payout)
 }
 
 // =============================================================================

@@ -23,4 +23,6 @@ pub enum CommonError {
     AlreadyInitialized = 4,
     /// Resource already exists.
     AlreadyExists = 5,
+    /// Contract has not been initialised yet; required storage key is absent.
+    NotInitialized = 6,
 }

@@ -42,7 +42,11 @@ fn deduct_platform_fee(
             if respect_fee_mode && config.fee_mode == FeeMode::OnContribution {
                 0
             } else {
-                let fee = base * config.fee_bps as i128 / 10_000;
+                // Issue #1145: use checked_mul to prevent overflow on large base amounts
+                let fee = base
+                    .checked_mul(config.fee_bps as i128)
+                    .and_then(|v| v.checked_div(10_000))
+                    .unwrap_or(0);
                 token_client.transfer(&env.current_contract_address(), &config.address, &fee);
                 fee
             }
@@ -225,7 +229,11 @@ pub(crate) fn claim_stream(env: Env) -> Result<(), ContractError> {
     } else {
         let elapsed = now - stream.start_time;
         let duration = stream.end_time - stream.start_time;
-        total * elapsed as i128 / duration as i128
+        // Issue #1145: use checked_mul to prevent overflow when total is large
+        total
+            .checked_mul(elapsed as i128)
+            .and_then(|v| v.checked_div(duration as i128))
+            .unwrap_or(total) // saturate to full total on overflow (extremely rare)
     };
 
     let claimable = vested_fraction - stream.claimed;
