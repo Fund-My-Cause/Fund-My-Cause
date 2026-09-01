@@ -25,6 +25,10 @@
     "./auth": {
       "import": "./src/auth.ts",
       "types": "./src/auth.ts"
+    },
+    "./errors": {
+      "import": "./src/errors.ts",
+      "types": "./src/errors.ts"
     }
   },
   "scripts": {
