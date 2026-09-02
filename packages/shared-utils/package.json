@@ -18,9 +18,17 @@
       "import": "./src/campaign.ts",
       "types": "./src/campaign.ts"
     },
-    "./pagination": {
-      "import": "./src/pagination.ts",
-      "types": "./src/pagination.ts"
+    "./timestamps": {
+      "import": "./src/timestamps.ts",
+      "types": "./src/timestamps.ts"
+    },
+    "./auth": {
+      "import": "./src/auth.ts",
+      "types": "./src/auth.ts"
+    },
+    "./errors": {
+      "import": "./src/errors.ts",
+      "types": "./src/errors.ts"
     }
   },
   "scripts": {
