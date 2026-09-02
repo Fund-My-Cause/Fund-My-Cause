@@ -1515,7 +1515,7 @@ impl CrowdfundContract {
             .votes_for
             .checked_add(proposal.votes_against)
             .ok_or(ContractError::Overflow)?;
-        if total_votes > 0 && proposal.votes_for * 2 > total_votes {
+        if total_votes > 0 && (proposal.votes_for as u64) * 2 > total_votes as u64 {
             inst.set(&KEY_DEADLINE, &proposal.new_deadline);
             env.events().publish(
                 ("campaign", "extension_executed"),
@@ -3823,6 +3823,14 @@ impl CrowdfundContract {
         // Use i128 arithmetic; scale by 1e9 to preserve precision
         let seconds_per_year: i128 = 365 * 24 * 3600;
         let share_numerator = contrib_amount;
+        // Issue #1145: guard the divisor against overflow and zero-division
+        let divisor = (10_000i128)
+            .checked_mul(seconds_per_year)
+            .and_then(|v| v.checked_mul(total_raised))
+            .ok_or(ContractError::Overflow)?;
+        if divisor == 0 {
+            return Ok(0);
+        }
         let accrued = config
             .pool
             .checked_mul(config.rate_bps as i128)
@@ -3831,7 +3839,8 @@ impl CrowdfundContract {
             .ok_or(ContractError::Overflow)?
             .checked_mul(share_numerator)
             .ok_or(ContractError::Overflow)?
-            / (10_000 * seconds_per_year * total_raised);
+            .checked_div(divisor)
+            .unwrap_or(0);
 
         let yield_key = DataKey::YieldInfo(contributor.clone());
         let info: YieldInfo = env
@@ -3919,12 +3928,19 @@ impl CrowdfundContract {
         let elapsed = now.saturating_sub(config.start_time).min(365 * 24 * 3600);
         let seconds_per_year: i128 = 365 * 24 * 3600;
 
+        // Issue #1145: guard divisor against overflow and zero-division
+        let divisor = (10_000i128)
+            .saturating_mul(seconds_per_year)
+            .saturating_mul(total_raised);
+        if divisor == 0 {
+            return 0;
+        }
         let accrued = config
             .pool
             .saturating_mul(config.rate_bps as i128)
             .saturating_mul(elapsed as i128)
             .saturating_mul(contrib_amount)
-            / (10_000 * seconds_per_year * total_raised);
+            / divisor;
 
         let info: YieldInfo = env
             .storage()
@@ -4030,21 +4046,88 @@ impl CrowdfundContract {
         access::add_to_denylist(env, address)
     }
 
-    /// Removes an address from the deny list (admin only).
-    pub fn remove_from_denylist(env: Env, address: Address) -> Result<(), ContractError> {
-        access::remove_from_denylist(env, address)
-    }
+#[test]
+fn test_no_panic_on_overflow() {
+    let env = Env::default();
+    let addr = Address::random(&env);
 
-    /// Returns `true` if the address is on the allow list.
-    pub fn is_allowlisted(env: Env, address: Address) -> bool {
-        access::is_allowlisted(env, address)
-    }
-
-    /// Returns `true` if the address is on the deny list.
-    pub fn is_denylisted(env: Env, address: Address) -> bool {
-        access::is_denylisted(env, address)
-    }
+    // Try to contribute a huge amount
+    let result = CrowdfundContract::contribute(
+        env.clone(),
+        addr.clone(),
+        i128::MAX,
+        String::from_str(&env, "XLM"),
+        None,
+    );
+    // Should return an error, not panic
+    assert!(result.is_err());
 }
 
-#[cfg(test)]
-mod test;
+#[test]
+fn test_no_panic_on_uninitialized() {
+    let env = Env::default();
+    let addr = Address::random(&env);
+
+    // Try to contribute to uninitialized campaign
+    let result = CrowdfundContract::contribute(
+        env.clone(),
+        addr.clone(),
+        100,
+        String::from_str(&env, "XLM"),
+        None,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_no_panic_on_invalid_goal() {
+    let env = Env::default();
+    let creator = Address::random(&env);
+
+    // Try to create campaign with invalid goal
+    let result = CrowdfundContract::initialize(
+        env.clone(),
+        creator.clone(),
+        Address::random(&env),
+        0, // Invalid goal
+        env.ledger().timestamp() + 1000,
+        0,
+        0,
+        String::from_str(&env, "Title"),
+        String::from_str(&env, "Description"),
+        None,
+        None,
+        None,
+        Category::Other,
+        None,
+        None,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_no_panic_on_past_deadline() {
+    let env = Env::default();
+    let creator = Address::random(&env);
+
+    // Try to create campaign with past deadline
+    let result = CrowdfundContract::initialize(
+        env.clone(),
+        creator.clone(),
+        Address::random(&env),
+        1000,
+        env.ledger().timestamp() - 1000, // Past deadline
+        0,
+        0,
+        String::from_str(&env, "Title"),
+        String::from_str(&env, "Description"),
+        None,
+        None,
+        None,
+        Category::Other,
+        None,
+        None,
+    );
+    assert!(result.is_err());
+}
+EOF

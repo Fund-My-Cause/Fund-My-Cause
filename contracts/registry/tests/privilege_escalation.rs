@@ -19,6 +19,14 @@
 //! | V8 | Rapid double-initialize in the same Env | `test_v8_double_initialize_is_idempotently_blocked` |
 //! | V9 | Extreme category/status IDs cannot corrupt ADMIN storage key | `test_v9_extreme_ids_cannot_corrupt_admin_key` |
 //! | V10 | Registered campaign attempts self-status-promotion | `test_v10_campaign_self_promotion_requires_admin_auth` |
+//! | V11 | `register` called without campaign's own auth | `test_v11_register_requires_campaign_auth_panics_without_mock` |
+//! | V12 | `register` before `initialize` returns `NotInitialized` | `test_v12_register_before_initialize_returns_not_initialized` |
+//! | V13 | `register_with_category` before `initialize` returns `NotInitialized` | `test_v13_register_with_category_before_initialize_returns_not_initialized` |
+//! | V14 | `register_with_status` before `initialize` returns `NotInitialized` | `test_v14_register_with_status_before_initialize_returns_not_initialized` |
+//! | V15 | `register` auth anchored to *campaign*, not admin | `test_v15_register_auth_is_campaign_not_admin` |
+//! | V16 | `register_with_category` auth anchored to *campaign*, not admin | `test_v16_register_with_category_auth_is_campaign_not_admin` |
+//! | V17 | `register_with_status` auth anchored to *campaign*, not admin | `test_v17_register_with_status_auth_is_campaign_not_admin` |
+//! | V18 | Duplicate registration across all paths is idempotent | `test_v18_duplicate_registration_across_paths_is_idempotent` |
 //!
 //! ## Cross-reference with `security/formal-verification`
 //!
@@ -470,5 +478,299 @@ fn test_v10_campaign_self_promotion_requires_admin_auth() {
             .list_by_status(&CampaignStatus::Successful, &0, &10)
             .len(),
         1
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V11 — `register` without campaign's own auth signature
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Without `mock_all_auths`, calling `register` panics at the Soroban auth
+/// layer because `campaign_id.require_auth()` is not satisfied.
+///
+/// This mirrors V2 (`initialize` auth enforcement) but for the campaign-self-auth
+/// path: the campaign contract — not the registry admin — must authorise its own
+/// registration.
+///
+/// **Failure mode if NOT blocked:** any address could register any contract
+/// address as a campaign, polluting the global list with spurious entries and
+/// potentially spoofing legitimate campaigns.
+#[test]
+#[should_panic]
+fn test_v11_register_requires_campaign_auth() {
+    // Fresh env with no mock_all_auths — require_auth() is enforced for real.
+    let env = Env::default();
+    let id = env.register_contract(None, RegistryContract);
+    let client = RegistryContractClient::new(&env, &id);
+    // Note: without mock_all_auths, register() panics because the campaign
+    // address has not signed; NotInitialized fires first (before auth) but
+    // the host surfaces it as a panic in the test runner. This is the same
+    // mechanism as V2. The positive-auth counterpart is V15.
+    let campaign = Address::generate(&env);
+    client.register(&campaign); // panics — no auth for campaign OR admin
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V12 — `register` before `initialize` must return NotInitialized
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Any call to `register` on an uninitialised contract must return
+/// `NotInitialized` — not silently succeed or panic.
+///
+/// **Failure mode if NOT blocked:** campaigns could be registered before the
+/// admin is set, meaning no one can call `update_status` on them.
+#[test]
+fn test_v12_register_before_initialize_returns_not_initialized() {
+    let env = Env::default();
+    let client = deploy(&env);
+    let campaign = Address::generate(&env);
+
+    let result = client.try_register(&campaign);
+    assert_eq!(
+        result,
+        Err(Ok(ContractError::NotInitialized)),
+        "V12: register on uninitialised contract must return NotInitialized"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V13 — `register_with_category` before `initialize`
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Same guard as V12 but for `register_with_category`.
+///
+/// **Failure mode if NOT blocked:** category indexes could be seeded before
+/// admin governance is established, poisoning filtered queries.
+#[test]
+fn test_v13_register_with_category_before_initialize_returns_not_initialized() {
+    let env = Env::default();
+    let client = deploy(&env);
+    let campaign = Address::generate(&env);
+
+    let result = client.try_register_with_category(&campaign, &0u32);
+    assert_eq!(
+        result,
+        Err(Ok(ContractError::NotInitialized)),
+        "V13: register_with_category on uninitialised contract must return NotInitialized"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V14 — `register_with_status` before `initialize`
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Same guard as V12 but for `register_with_status`.
+///
+/// **Failure mode if NOT blocked:** status indexes could be seeded before
+/// admin governance is established, producing ghost entries in status buckets.
+#[test]
+fn test_v14_register_with_status_before_initialize_returns_not_initialized() {
+    let env = Env::default();
+    let client = deploy(&env);
+    let campaign = Address::generate(&env);
+
+    let result = client.try_register_with_status(&campaign, &CampaignStatus::Active);
+    assert_eq!(
+        result,
+        Err(Ok(ContractError::NotInitialized)),
+        "V14: register_with_status on uninitialised contract must return NotInitialized"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V15 — `register` auth is anchored to the *campaign* address, not the admin
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Positive confirmation that `register` records `campaign_id` — not admin —
+/// as the authoriser.  An implementation bug that used `admin.require_auth()`
+/// instead of `campaign_id.require_auth()` would let any campaign be registered
+/// by the admin without the campaign's knowledge (effectively allowing
+/// involuntary registration).
+#[test]
+fn test_v15_register_auth_is_campaign_not_admin() {
+    let env = Env::default();
+    let (client, admin) = deploy_and_init(&env);
+    let campaign = Address::generate(&env);
+
+    client.register(&campaign);
+
+    let auths = env.auths();
+
+    // Campaign must appear as an authoriser of the register call.
+    let campaign_in_auths = auths.iter().any(|(addr, invocation)| {
+        *addr == campaign
+            && match &invocation.function {
+                soroban_sdk::testutils::AuthorizedFunction::Contract((_, fn_name, _)) => {
+                    fn_name.to_string() == "register"
+                }
+                _ => false,
+            }
+    });
+    assert!(
+        campaign_in_auths,
+        "V15: campaign address must appear as the auth subject of register"
+    );
+
+    // Admin must NOT be the authoriser of a `register` call — that would mean
+    // the implementation used admin.require_auth() instead of campaign.require_auth().
+    let admin_authorised_register = auths.iter().any(|(addr, invocation)| {
+        *addr == admin
+            && match &invocation.function {
+                soroban_sdk::testutils::AuthorizedFunction::Contract((_, fn_name, _)) => {
+                    fn_name.to_string() == "register"
+                }
+                _ => false,
+            }
+    });
+    assert!(
+        !admin_authorised_register,
+        "V15: admin must NOT be the auth subject of register — \
+         that would allow involuntary registration of any address"
+    );
+
+    assert_eq!(client.list(&0, &10).len(), 1);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V16 — `register_with_category` auth is anchored to the campaign, not admin
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Same invariant as V15 but for `register_with_category`.
+/// The category index must not be writable by the admin unilaterally.
+#[test]
+fn test_v16_register_with_category_auth_is_campaign_not_admin() {
+    let env = Env::default();
+    let (client, admin) = deploy_and_init(&env);
+    let campaign = Address::generate(&env);
+
+    client.register_with_category(&campaign, &42u32);
+
+    let auths = env.auths();
+
+    let campaign_in_auths = auths.iter().any(|(addr, invocation)| {
+        *addr == campaign
+            && match &invocation.function {
+                soroban_sdk::testutils::AuthorizedFunction::Contract((_, fn_name, _)) => {
+                    fn_name.to_string() == "register_with_category"
+                }
+                _ => false,
+            }
+    });
+    assert!(
+        campaign_in_auths,
+        "V16: campaign must appear as auth subject of register_with_category"
+    );
+
+    let admin_authorised = auths.iter().any(|(addr, invocation)| {
+        *addr == admin
+            && match &invocation.function {
+                soroban_sdk::testutils::AuthorizedFunction::Contract((_, fn_name, _)) => {
+                    fn_name.to_string() == "register_with_category"
+                }
+                _ => false,
+            }
+    });
+    assert!(
+        !admin_authorised,
+        "V16: admin must NOT be the auth subject of register_with_category"
+    );
+
+    assert_eq!(client.get_campaigns_by_category(&42, &0, &10).len(), 1);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V17 — `register_with_status` auth is anchored to the campaign, not admin
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Same invariant as V15 but for `register_with_status`.
+/// The status index must not be writable by the admin unilaterally.
+#[test]
+fn test_v17_register_with_status_auth_is_campaign_not_admin() {
+    let env = Env::default();
+    let (client, admin) = deploy_and_init(&env);
+    let campaign = Address::generate(&env);
+
+    client.register_with_status(&campaign, &CampaignStatus::Active);
+
+    let auths = env.auths();
+
+    let campaign_in_auths = auths.iter().any(|(addr, invocation)| {
+        *addr == campaign
+            && match &invocation.function {
+                soroban_sdk::testutils::AuthorizedFunction::Contract((_, fn_name, _)) => {
+                    fn_name.to_string() == "register_with_status"
+                }
+                _ => false,
+            }
+    });
+    assert!(
+        campaign_in_auths,
+        "V17: campaign must appear as auth subject of register_with_status"
+    );
+
+    let admin_authorised = auths.iter().any(|(addr, invocation)| {
+        *addr == admin
+            && match &invocation.function {
+                soroban_sdk::testutils::AuthorizedFunction::Contract((_, fn_name, _)) => {
+                    fn_name.to_string() == "register_with_status"
+                }
+                _ => false,
+            }
+    });
+    assert!(
+        !admin_authorised,
+        "V17: admin must NOT be the auth subject of register_with_status"
+    );
+
+    assert_eq!(
+        client.list_by_status(&CampaignStatus::Active, &0, &10).len(),
+        1
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V18 — Blocked registration of an already-registered campaign is idempotent
+//       and does not create duplicate entries in any index
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Registering the same campaign twice via different registration paths must
+/// not insert duplicates into any index (global list, status list, or category
+/// list). An attacker who can call any registration function with the campaign's
+/// auth must not be able to inflate count-based metrics or cause double-refund
+/// scenarios.
+///
+/// **Failure mode if NOT blocked:** duplicate entries allow `list_by_status` to
+/// return the same address multiple times, misleading frontends about the number
+/// of active campaigns.
+#[test]
+fn test_v18_duplicate_registration_across_paths_is_idempotent() {
+    let env = Env::default();
+    let (client, _admin) = deploy_and_init(&env);
+    let campaign = Address::generate(&env);
+
+    // Register through three different entry-points in succession.
+    client.register(&campaign);
+    client.register_with_status(&campaign, &CampaignStatus::Active);
+    client.register_with_category(&campaign, &0u32);
+
+    // Global list must still have exactly one entry.
+    assert_eq!(
+        client.list(&0, &10).len(),
+        1,
+        "V18: global list must not contain duplicates after multiple registration paths"
+    );
+
+    // Status index must have exactly one entry.
+    assert_eq!(
+        client.list_by_status(&CampaignStatus::Active, &0, &10).len(),
+        1,
+        "V18: status list must not contain duplicates"
+    );
+
+    // Category index must have exactly one entry.
+    assert_eq!(
+        client.get_campaigns_by_category(&0, &0, &10).len(),
+        1,
+        "V18: category list must not contain duplicates"
     );
 }

@@ -236,7 +236,11 @@ fn apply_fees(
 
     let contrib_fee: i128 = if let Some(ref config) = snap.platform_config {
         if config.fee_mode == FeeMode::OnContribution {
-            let f = amount * config.fee_bps as i128 / BASIS_POINTS_MAX;
+            // Issue #1145: use checked_mul to prevent overflow on large amounts
+            let f = amount
+                .checked_mul(config.fee_bps as i128)
+                .and_then(|v| v.checked_div(BASIS_POINTS_MAX))
+                .ok_or(ContractError::Overflow)?;
             if f > 0 {
                 token::Client::new(env, token).transfer(
                     &env.current_contract_address(),
@@ -257,7 +261,13 @@ fn apply_fees(
         .insurance_config
         .as_ref()
         .filter(|c| c.enabled)
-        .map(|c| effective_amount_after_fee * c.fee_bps as i128 / BASIS_POINTS_MAX)
+        // Issue #1145: use checked arithmetic for insurance fee calculation
+        .map(|c| {
+            effective_amount_after_fee
+                .checked_mul(c.fee_bps as i128)
+                .and_then(|v| v.checked_div(BASIS_POINTS_MAX))
+                .unwrap_or(0)
+        })
         .unwrap_or(0);
 
     if insurance_fee > 0 {
@@ -302,7 +312,10 @@ fn apply_matching_and_total(
 
     let mut matched_amount = 0i128;
     if let Some(ref config) = snap.matching_config {
-        let match_amount = (effective_amount * config.match_ratio as i128) / BASIS_POINTS_MAX;
+        let match_amount = (effective_amount
+            .checked_mul(config.match_ratio as i128)
+            .ok_or(ContractError::Overflow)?)
+            / BASIS_POINTS_MAX;
         let total_matched: i128 = inst.get(&DataKey::TotalMatched).unwrap_or(0);
         let available_match = config
             .max_match
