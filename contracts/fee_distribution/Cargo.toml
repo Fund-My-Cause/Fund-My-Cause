@@ -1,0 +1,16 @@
+[package]
+name = "fee_distribution"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Fund-My-Cause fee distribution contract for splitting payments among multiple recipients on the Stellar/Soroban network"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

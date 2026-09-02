@@ -1,97 +1,138 @@
 import "dotenv/config";
+import http from "http";
 import express, { Express } from "express";
 import pino from "pino";
 import { SorobanRPCClient } from "./rpc-client";
 import { HealthChecker } from "./health-checker";
 import { EventStore } from "./event-store";
 
-// Environment variables
-const PORT = parseInt(process.env.PORT ?? "3001", 10);
-const RPC_URL = process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org:443";
-const CONTRACT_ID = process.env.CROWDFUND_CONTRACT_ID ?? "";
-const LOG_LEVEL = process.env.LOG_LEVEL ?? "info";
+// ── Environment variables ─────────────────────────────────────────────────────
 
-// Logger
+const PORT          = parseInt(process.env.PORT          ?? "3001", 10);
+const RPC_URL       = process.env.SOROBAN_RPC_URL         ?? "https://soroban-testnet.stellar.org:443";
+const CONTRACT_ID   = process.env.CROWDFUND_CONTRACT_ID   ?? "";
+const LOG_LEVEL     = process.env.LOG_LEVEL               ?? "info";
+/** Maximum milliseconds to wait for in-flight work before forced exit. */
+const SHUTDOWN_TIMEOUT_MS = parseInt(process.env.SHUTDOWN_TIMEOUT_MS ?? "10000", 10);
+
+// ── Logger ────────────────────────────────────────────────────────────────────
+
 const logger = pino({ level: LOG_LEVEL });
 
-// Express app
+// ── Application wiring ────────────────────────────────────────────────────────
+
 const app: Express = express();
 
-// Global state
-const rpcClient = new SorobanRPCClient(
-  { url: RPC_URL, contractId: CONTRACT_ID },
-  logger
-);
+const rpcClient    = new SorobanRPCClient({ url: RPC_URL, contractId: CONTRACT_ID }, logger);
 const healthChecker = new HealthChecker(logger);
-const eventStore = new EventStore(logger);
+const eventStore   = new EventStore(logger);
 
-let isRunning = false;
+// ── Shutdown state ────────────────────────────────────────────────────────────
+
+/** Set to true once SIGTERM / SIGINT has been received. */
+export let isShuttingDown = false;
+
+/** Counts batches currently being processed (entered but not finished). */
+let inFlightBatches = 0;
 
 /**
- * Start the indexer service
+ * Resolves when all in-flight batches have drained.
+ * Produced by gracefulShutdown(); consumed by the test helper.
  */
-async function startIndexer(): Promise<void> {
+let drainResolve: (() => void) | null = null;
+let drainPromise: Promise<void>       | null = null;
+
+/** Create a fresh drain gate (called once per shutdown). */
+function createDrainGate(): Promise<void> {
+  drainPromise = new Promise<void>((resolve) => {
+    drainResolve = resolve;
+  });
+  return drainPromise;
+}
+
+/** Call after every batch completes to check whether all work has drained. */
+function tickDrain(): void {
+  if (drainResolve && inFlightBatches === 0) {
+    drainResolve();
+    drainResolve = null;
+  }
+}
+
+// ── Indexer loop ──────────────────────────────────────────────────────────────
+
+export let isRunning = false;
+
+/**
+ * Start the indexer service.
+ * Streams events from Soroban RPC and stores them in the EventStore.
+ * Respects the shutdown flag — stops accepting new batches when shutting down.
+ */
+export async function startIndexer(): Promise<void> {
   logger.info({ rpc: RPC_URL, contract: CONTRACT_ID }, "Starting indexer service");
 
-  // Connect to RPC
   const connected = await rpcClient.connect();
   if (!connected) {
     logger.error("Failed to connect to Soroban RPC. Retrying in 10 seconds...");
-    setTimeout(startIndexer, 10000);
+    setTimeout(startIndexer, 10_000);
     return;
   }
 
   isRunning = true;
 
-  // Stream events
-  logger.info("Streaming events from Soroban RPC");
   for await (const events of rpcClient.streamEvents()) {
+    // Stop accepting new work once a shutdown signal has arrived.
+    if (isShuttingDown) {
+      logger.info("Shutdown in progress — discarding incoming event batch");
+      break;
+    }
+
+    inFlightBatches++;
     try {
-      // Store events
       eventStore.addEvents(events);
 
-      // Update health
       for (const event of events) {
         healthChecker.recordEvent(parseInt(event.id.split("-")[0] ?? "0", 10));
       }
 
-      // Log batch
       logger.debug({ eventCount: events.length }, "Ingested events");
     } catch (error) {
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
-        "Error processing events"
+        "Error processing events",
       );
+    } finally {
+      inFlightBatches--;
+      tickDrain();
     }
   }
+
+  isRunning = false;
 }
 
-/**
- * Routes
- */
+// ── Routes ────────────────────────────────────────────────────────────────────
 
-// Health endpoint
 app.get("/health", (req, res) => {
-  const status = healthChecker.getStatus();
-  const statusCode = status.status === "healthy" ? 200 : status.status === "degraded" ? 202 : 503;
+  if (isShuttingDown) {
+    return res.status(503).json({ status: "shutting_down" });
+  }
+  const status     = healthChecker.getStatus();
+  const statusCode =
+    status.status === "healthy" ? 200 : status.status === "degraded" ? 202 : 503;
   res.status(statusCode).json(status);
 });
 
-// Readiness endpoint
 app.get("/ready", (req, res) => {
-  if (isRunning) {
-    res.status(200).json({ ready: true });
-  } else {
-    res.status(503).json({ ready: false });
+  if (isShuttingDown || !isRunning) {
+    return res.status(503).json({ ready: false });
   }
+  res.status(200).json({ ready: true });
 });
 
-// Events query endpoint
 app.get("/events", (req, res) => {
   const { contractId, type, limit = "100" } = req.query;
   const limitNum = Math.min(parseInt(limit as string, 10) || 100, 1000);
 
-  let events = [];
+  let events: ReturnType<typeof eventStore.getAllEvents> = [];
   if (contractId) {
     events = eventStore.queryByContract(contractId as string, limitNum);
   } else if (type) {
@@ -103,41 +144,107 @@ app.get("/events", (req, res) => {
   res.json({ count: events.length, events });
 });
 
-// Stats endpoint
 app.get("/stats", (req, res) => {
   const health = healthChecker.getStatus();
   res.json({
-    eventCount: eventStore.getCount(),
-    health: health.status,
-    uptime: health.uptime,
-    lastLedger: health.lastLedger,
+    eventCount:      eventStore.getCount(),
+    health:          health.status,
+    uptime:          health.uptime,
+    lastLedger:      health.lastLedger,
     eventsProcessed: health.eventsProcessed,
   });
 });
 
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+
 /**
- * Start server
+ * Perform a graceful shutdown:
+ *
+ * 1. Mark `isShuttingDown = true` so the indexer loop and health endpoints
+ *    know to reject new work.
+ * 2. Stop the HTTP server from accepting new connections (existing keep-alive
+ *    connections are drained by `server.close()`).
+ * 3. Wait up to `SHUTDOWN_TIMEOUT_MS` for in-flight event batches to finish.
+ * 4. If the timeout expires before the drain completes, log a warning and
+ *    proceed with a forced exit anyway.
+ * 5. Exit with code 0 (or the provided code).
+ *
+ * @param server   - The HTTP server to close.
+ * @param exitCode - Exit code to use (default 0).
  */
-app.listen(PORT, async () => {
+export async function gracefulShutdown(
+  server: http.Server,
+  exitCode: number = 0,
+): Promise<void> {
+  if (isShuttingDown) return; // idempotent
+
+  isShuttingDown = true;
+  logger.info("Graceful shutdown initiated — stopping new work");
+
+  // 1. Stop the HTTP server from accepting new connections.
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  logger.info("HTTP server closed");
+
+  // 2. Drain in-flight batches (or time out).
+  if (inFlightBatches > 0) {
+    logger.info({ inFlightBatches }, "Waiting for in-flight batches to drain…");
+
+    const drain = createDrainGate();
+    const timeout = new Promise<void>((resolve) =>
+      setTimeout(() => {
+        logger.warn(
+          { inFlightBatches, timeoutMs: SHUTDOWN_TIMEOUT_MS },
+          "Drain timeout reached — forcing exit with pending batches",
+        );
+        resolve();
+      }, SHUTDOWN_TIMEOUT_MS),
+    );
+
+    await Promise.race([drain, timeout]);
+  } else {
+    logger.info("No in-flight batches — drain skipped");
+  }
+
+  logger.info({ exitCode }, "Shutdown complete — exiting");
+  process.exit(exitCode);
+}
+
+// ── Process signal handlers ───────────────────────────────────────────────────
+
+let httpServer: http.Server;
+
+export function registerSignalHandlers(server: http.Server): void {
+  httpServer = server;
+
+  process.on("SIGTERM", () => {
+    logger.info("Received SIGTERM");
+    gracefulShutdown(server, 0).catch((err) => {
+      logger.error({ err }, "Error during graceful shutdown");
+      process.exit(1);
+    });
+  });
+
+  process.on("SIGINT", () => {
+    logger.info("Received SIGINT");
+    gracefulShutdown(server, 0).catch((err) => {
+      logger.error({ err }, "Error during graceful shutdown");
+      process.exit(1);
+    });
+  });
+}
+
+// ── Start server ──────────────────────────────────────────────────────────────
+
+const server = app.listen(PORT, async () => {
   logger.info({ port: PORT }, "Indexer service listening");
 
-  // Start indexing in background
   startIndexer().catch((error) => {
     logger.error(
       { error: error instanceof Error ? error.message : String(error) },
-      "Indexer crashed"
+      "Indexer crashed",
     );
     process.exit(1);
   });
 });
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  logger.info("Received SIGTERM, shutting down gracefully");
-  process.exit(0);
-});
-
-process.on("SIGINT", () => {
-  logger.info("Received SIGINT, shutting down gracefully");
-  process.exit(0);
-});
+registerSignalHandlers(server);

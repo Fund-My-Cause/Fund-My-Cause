@@ -1,0 +1,27 @@
+[package]
+name = "escrow"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Fund-My-Cause escrow contract — conditional token custody with multisig and dispute resolution on Stellar/Soroban"
+documentation = "https://fund-my-cause.github.io/Fund-My-Cause/escrow"
+readme = "../../README.md"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+# docs.rs configuration
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+  "--cfg", "docsrs",
+  "--default-theme=ayu",
+]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

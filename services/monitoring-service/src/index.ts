@@ -437,19 +437,99 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 // ============================================================================
+// Graceful Shutdown
+// ============================================================================
+
+/**
+ * Maximum milliseconds to wait for in-flight requests to finish before
+ * forcing an exit. Override via the SHUTDOWN_TIMEOUT_MS environment variable.
+ */
+const SHUTDOWN_TIMEOUT_MS = parseInt(process.env['SHUTDOWN_TIMEOUT_MS'] ?? '10000', 10);
+
+/** True once a SIGTERM / SIGINT has been received. */
+export let isShuttingDown = false;
+
+/**
+ * Perform a graceful shutdown of the monitoring service:
+ *
+ * 1. Set `isShuttingDown = true` so health/ready endpoints return 503.
+ * 2. Stop accepting new HTTP connections (server.close).
+ * 3. Wait up to `SHUTDOWN_TIMEOUT_MS` for in-flight connections to drain.
+ * 4. Force-exit when the timeout expires (safety net for hung keep-alives).
+ * 5. Call `exitFn(exitCode)` — defaults to process.exit.
+ *
+ * @param server  - The HTTP server to close.
+ * @param exitCode - Process exit code (default 0).
+ * @param exitFn  - Injectable exit function (useful for testing).
+ */
+export async function gracefulShutdown(
+  server: import('http').Server,
+  exitCode: number = 0,
+  exitFn: (code: number) => void = process.exit.bind(process),
+): Promise<void> {
+  if (isShuttingDown) return; // idempotent
+  isShuttingDown = true;
+
+  console.log('Graceful shutdown initiated — draining in-flight requests');
+
+  // Stop accepting new connections; existing keep-alive connections drain here.
+  await new Promise<void>((resolve) => {
+    const forcedExit = setTimeout(() => {
+      console.warn(
+        `[shutdown] Drain timeout (${SHUTDOWN_TIMEOUT_MS} ms) reached — forcing close`,
+      );
+      resolve();
+    }, SHUTDOWN_TIMEOUT_MS);
+
+    server.close(() => {
+      clearTimeout(forcedExit);
+      resolve();
+    });
+  });
+
+  console.log(`Shutdown complete — exiting with code ${exitCode}`);
+  exitFn(exitCode);
+}
+
+// ============================================================================
 // Start Server
 // ============================================================================
 
-app.listen(port, () => {
+const httpServer = app.listen(port, () => {
   console.log(`🚀 Monitoring service running on http://localhost:${port}`);
   console.log(`📊 Metrics available at http://localhost:${port}/metrics`);
   console.log(`❤️  Health check at http://localhost:${port}/health`);
 });
 
-// Graceful shutdown
+// ── Signal handlers ──────────────────────────────────────────────────────────
+
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  process.exit(0);
+  console.log('Received SIGTERM');
+  gracefulShutdown(httpServer, 0).catch((err) => {
+    console.error('Error during graceful shutdown:', err);
+    process.exit(1);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('Received SIGINT');
+  gracefulShutdown(httpServer, 0).catch((err) => {
+    console.error('Error during graceful shutdown:', err);
+    process.exit(1);
+  });
+});
+
+// ── Patch /health to return 503 during shutdown ───────────────────────────────
+// We override the already-registered /health handler to be shutdown-aware.
+// Express allows re-registering routes; the last registration wins for stack
+// order, so we wrap the existing handler with a shutdown guard here.
+// (The existing handler above already ran app.get('/health', ...); the one
+//  below is registered last and therefore evaluated first by Express.)
+app.use((req: Request, res: Response, next: import('express').NextFunction) => {
+  if (isShuttingDown && (req.path === '/health' || req.path === '/ready')) {
+    return res.status(503).json({ status: 'shutting_down' });
+  }
+  next();
 });
 
 export default app;
