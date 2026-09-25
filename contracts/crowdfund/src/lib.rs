@@ -130,7 +130,6 @@ pub mod fuzz_api {
 pub use errors::ContractError;
 pub use security::{CircuitBreaker, ContributorGate, InputValidator, RateLimiter, ReentrancyGuard};
 pub use storage::{
-    BASIS_POINTS_MAX,
     CONTRACT_VERSION,
     KEY_ADMIN,
     KEY_ANALYTICS,
@@ -215,7 +214,7 @@ pub use types::{
     // #459
     ContractStateSnapshot,
     // #416
-    ContributionRecord,
+    ContributionHistory,
     DataKey,
     Delegation,
     Dispute,
@@ -325,7 +324,7 @@ pub use types::{
     MatchingConfig,
     // Issue #423
     MetadataVersion,
-    Milestone,
+    FundingMilestone,
     MilestoneStatus,
     // #443
     PerformanceMetrics,
@@ -1936,7 +1935,7 @@ impl CrowdfundContract {
 
     /// Returns the full contribution history for a contributor.
     ///
-    /// Each entry is a [`ContributionRecord`] capturing the amount, ledger
+    /// Each entry is a [`ContributionHistory`] capturing the amount, ledger
     /// timestamp, and running total at the time of the contribution.  Records
     /// are appended chronologically by [`contribute`](CrowdfundContract::contribute).
     ///
@@ -1945,8 +1944,8 @@ impl CrowdfundContract {
     /// * `contributor` - Address whose history to retrieve
     ///
     /// # Returns
-    /// Ordered `Vec<ContributionRecord>` — empty if the address has never contributed
-    pub fn get_contribution_history(env: Env, contributor: Address) -> Vec<ContributionRecord> {
+    /// Ordered `Vec<ContributionHistory>` — empty if the address has never contributed
+    pub fn get_contribution_history(env: Env, contributor: Address) -> Vec<ContributionHistory> {
         views::get_contribution_history(env, contributor)
     }
 
@@ -2999,7 +2998,7 @@ impl CrowdfundContract {
     ///
     /// Only the creator can call this function. Milestones define target amounts
     /// that trigger fund releases when reached and verified.
-    pub fn set_milestones(env: Env, milestones: Vec<Milestone>) -> Result<(), ContractError> {
+    pub fn set_milestones(env: Env, milestones: Vec<FundingMilestone>) -> Result<(), ContractError> {
         let creator: Address = env
             .storage()
             .instance()
@@ -3016,7 +3015,7 @@ impl CrowdfundContract {
     }
 
     /// Gets all milestones for the campaign.
-    pub fn get_milestones(env: Env) -> Result<Vec<Milestone>, ContractError> {
+    pub fn get_milestones(env: Env) -> Result<Vec<FundingMilestone>, ContractError> {
         env.storage()
             .persistent()
             .get(&KEY_MILESTONES)
@@ -3035,7 +3034,7 @@ impl CrowdfundContract {
             .ok_or(ContractError::NotCreator)?;
         creator.require_auth();
 
-        let mut milestones: Vec<Milestone> = env
+        let mut milestones: Vec<FundingMilestone> = env
             .storage()
             .persistent()
             .get(&KEY_MILESTONES)

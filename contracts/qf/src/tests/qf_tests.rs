@@ -105,3 +105,183 @@ proptest! {
         }
     }
 }
+
+// ================================================================
+// Negative-path tests
+// ================================================================
+
+/// Test: calculate_qf entry point rejects zero pool amounts
+#[test]
+fn test_calculate_qf_rejects_zero_pool() {
+    let env = Env::default();
+    let mut contributions = Map::new(&env);
+    let mut contributor_counts = Map::new(&env);
+    let addr = Address::random(&env);
+    contributions.set(addr.clone(), 1000);
+    contributor_counts.set(addr, 5);
+
+    let result = QFContract::calculate_qf(
+        env.clone(),
+        0,
+        contributions,
+        contributor_counts,
+        0,
+    );
+    assert_eq!(result, Err(QFError::InvalidPoolAmount));
+}
+
+/// Test: calculate_qf entry point rejects negative pool amounts
+#[test]
+fn test_calculate_qf_rejects_negative_pool() {
+    let env = Env::default();
+    let mut contributions = Map::new(&env);
+    let mut contributor_counts = Map::new(&env);
+    let addr = Address::random(&env);
+    contributions.set(addr.clone(), 1000);
+    contributor_counts.set(addr, 5);
+
+    let result = QFContract::calculate_qf(
+        env.clone(),
+        -100,
+        contributions,
+        contributor_counts,
+        0,
+    );
+    assert_eq!(result, Err(QFError::InvalidPoolAmount));
+}
+
+/// Test: calculate_qf rejects empty contributions
+#[test]
+fn test_calculate_qf_rejects_empty_contributions() {
+    let env = Env::default();
+    let contributions = Map::new(&env);
+    let contributor_counts = Map::new(&env);
+
+    let result = QFContract::calculate_qf(
+        env.clone(),
+        10_000,
+        contributions,
+        contributor_counts,
+        0,
+    );
+    assert_eq!(result, Err(QFError::NoContributions));
+}
+
+/// Test: double invocation with same inputs produces identical results
+/// (verifies no state mutation / replay issue on stateless computation)
+#[test]
+fn test_calculate_qf_deterministic_no_replay() {
+    let env = Env::default();
+    let addr1 = Address::random(&env);
+    let addr2 = Address::random(&env);
+
+    let mut contributions1 = Map::new(&env);
+    let mut contributor_counts1 = Map::new(&env);
+    contributions1.set(addr1.clone(), 5000);
+    contributions1.set(addr2.clone(), 3000);
+    contributor_counts1.set(addr1.clone(), 10);
+    contributor_counts1.set(addr2, 7);
+
+    let result1 = QFContract::calculate_qf(
+        env.clone(),
+        100_000,
+        contributions1,
+        contributor_counts1,
+        0,
+    ).unwrap();
+
+    let mut contributions2 = Map::new(&env);
+    let mut contributor_counts2 = Map::new(&env);
+    contributions2.set(addr1.clone(), 5000);
+    contributions2.set(addr2.clone(), 3000);
+    contributor_counts2.set(addr1.clone(), 10);
+    contributor_counts2.set(addr2, 7);
+
+    let result2 = QFContract::calculate_qf(
+        env.clone(),
+        100_000,
+        contributions2,
+        contributor_counts2,
+        0,
+    ).unwrap();
+
+    assert_eq!(result1.total_distributed, result2.total_distributed);
+    assert_eq!(result1.remaining_pool, result2.remaining_pool);
+    assert_eq!(result1.recipients_funded, result2.recipients_funded);
+}
+
+/// Test: recipients below min_threshold receive zero matching
+#[test]
+fn test_calculate_qf_below_threshold_gets_no_matching() {
+    let env = Env::default();
+    let addr = Address::random(&env);
+
+    let mut contributions = Map::new(&env);
+    let mut contributor_counts = Map::new(&env);
+    contributions.set(addr.clone(), 500);
+    contributor_counts.set(addr, 3);
+
+    let result = QFContract::calculate_qf(
+        env.clone(),
+        10_000,
+        contributions,
+        contributor_counts,
+        1000,
+    );
+
+    if let Ok(r) = result {
+        assert_eq!(r.recipients_funded, 0);
+        assert_eq!(r.total_distributed, 0);
+        assert_eq!(r.remaining_pool, 10_000);
+    }
+}
+
+/// Test: zero contributor count yields no allocation
+#[test]
+fn test_calculate_qf_zero_contributor_count() {
+    let env = Env::default();
+    let addr = Address::random(&env);
+
+    let mut contributions = Map::new(&env);
+    let mut contributor_counts = Map::new(&env);
+    contributions.set(addr.clone(), 5000);
+    contributor_counts.set(addr, 0);
+
+    let result = QFContract::calculate_qf(
+        env.clone(),
+        10_000,
+        contributions,
+        contributor_counts,
+        0,
+    );
+
+    if let Ok(r) = result {
+        assert_eq!(r.recipients_funded, 0);
+        assert_eq!(r.total_distributed, 0);
+    }
+}
+
+/// Test: negative contribution amounts are skipped
+#[test]
+fn test_calculate_qf_negative_contribution_skipped() {
+    let env = Env::default();
+    let addr = Address::random(&env);
+
+    let mut contributions = Map::new(&env);
+    let mut contributor_counts = Map::new(&env);
+    contributions.set(addr.clone(), -500);
+    contributor_counts.set(addr, 5);
+
+    let result = QFContract::calculate_qf(
+        env.clone(),
+        10_000,
+        contributions,
+        contributor_counts,
+        0,
+    );
+
+    if let Ok(r) = result {
+        assert_eq!(r.recipients_funded, 0);
+        assert_eq!(r.total_distributed, 0);
+    }
+}

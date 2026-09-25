@@ -55,10 +55,12 @@ use crate::{
         KEY_VESTING,
     },
     types::{
-        CampaignInfo, Category, ContributionRecord, ExtensionProposal, FeeMode, GoalAdjustment,
+        CampaignInfo, Category, ContributionHistory, ExtensionProposal, FeeMode, GoalAdjustment,
         PlatformConfig, RecurringPlan, Status, VestingSchedule,
     },
 };
+
+use common::math::{apply_bps, apply_bps_saturating};
 
 // =============================================================================
 // Per-call instance-storage cache (issue #1148)
@@ -151,7 +153,7 @@ impl CachedInstanceView {
     pub(crate) fn platform_fee_for(&self, amount: i128) -> i128 {
         self.platform_config
             .as_ref()
-            .map(|c| amount * c.fee_bps as i128 / 10_000)
+            .map(|c| apply_bps_saturating(amount, c.fee_bps))
             .unwrap_or(0)
     }
 
@@ -386,15 +388,9 @@ pub(crate) fn get_vested_amount(env: Env) -> i128 {
         return 0;
     }
 
-    // Issue #1145: use checked_mul to prevent overflow on large totals
     let platform_fee = inst
         .get::<_, PlatformConfig>(&KEY_PLATFORM)
-        .map(|c| {
-            total
-                .checked_mul(c.fee_bps as i128)
-                .and_then(|v| v.checked_div(10_000))
-                .unwrap_or(0)
-        })
+        .map(|c| apply_bps(total, c.fee_bps).unwrap_or(0))
         .unwrap_or(0);
     let payout = total - platform_fee;
 
@@ -430,7 +426,7 @@ pub(crate) fn get_goal_history(env: Env) -> Vec<GoalAdjustment> {
 }
 
 /// Returns the contribution history for a contributor.
-pub(crate) fn get_contribution_history(env: Env, contributor: Address) -> Vec<ContributionRecord> {
+pub(crate) fn get_contribution_history(env: Env, contributor: Address) -> Vec<ContributionHistory> {
     env.storage()
         .persistent()
         .get(&DataKey::ContributionHistory(contributor))
