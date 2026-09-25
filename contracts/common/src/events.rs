@@ -4,7 +4,14 @@
 //! in the Fund-My-Cause ecosystem. Events are structured for easy consumption
 //! by indexers and off-chain services.
 
-use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Val, Vec};
+
+/// Shared starting schema version for all contract events. Each contract
+/// re-exports this as its own `EVENT_SCHEMA_VERSION` so a future divergence
+/// (one contract's event shapes evolving faster than another's) is a
+/// one-line change at the re-export site, not a breaking change to this
+/// shared constant.
+pub const EVENT_SCHEMA_VERSION: u32 = 1;
 
 // ================================================================
 // Shared Event Topics
@@ -12,7 +19,7 @@ use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Vec};
 
 /// Standardized event topics for all contracts
 pub mod topics {
-    use soroban_sdk::symbol_short;
+    use soroban_sdk::{symbol_short, Symbol};
 
     // ── Registry Events ────────────────────────────────────────────
     pub const REGISTRY_INITIALIZED: Symbol = symbol_short!("reg_init");
@@ -70,7 +77,7 @@ pub struct EventEmitter;
 
 impl EventEmitter {
     /// Emit a simple event with a single payload
-    pub fn emit<T: soroban_sdk::IntoVal<Env, Vec<Val>>>(
+    pub fn emit<T: soroban_sdk::IntoVal<Env, Val>>(
         env: &Env,
         topic: Symbol,
         data: T,
@@ -79,7 +86,7 @@ impl EventEmitter {
     }
 
     /// Emit an event with version
-    pub fn emit_with_version<T: soroban_sdk::IntoVal<Env, Vec<Val>>>(
+    pub fn emit_with_version<T: soroban_sdk::IntoVal<Env, Val>>(
         env: &Env,
         topic: Symbol,
         version: &str,
@@ -89,10 +96,10 @@ impl EventEmitter {
     }
 
     /// Emit a typed event with standard fields
-    pub fn emit_typed<T: serde::Serialize + soroban_sdk::IntoVal<Env, Vec<Val>>>(
+    pub fn emit_typed<T: soroban_sdk::IntoVal<Env, Val>>(
         env: &Env,
         topic: Symbol,
-        event: &T,
+        event: T,
     ) {
         env.events().publish((topic, "v1"), event);
     }
@@ -492,85 +499,85 @@ impl EventEmitter {
 // Event Schema Documentation
 // ================================================================
 
-/// Event schema for indexer consumption
-///
-/// All events follow this structure:
-///
-/// ```json
-/// {
-///   "topic": "event_name",
-///   "version": "v1",
-///   "data": {
-///     // Event-specific fields
-///   },
-///   "timestamp": 1234567890
-/// }
-/// ```
-///
-/// ## Registry Events
-///
-/// | Event | Topic | Data Fields |
-/// |-------|-------|-------------|
-/// | Registry Initialized | `reg_init` | `admin`, `timestamp` |
-/// | Project Registered | `reg_proj` | `project_id`, `creator`, `name`, `category`, `timestamp` |
-/// | Project Updated | `reg_upd` | `project_id`, `updated_by`, `timestamp` |
-/// | Project Verified | `reg_ver` | `project_id`, `verifier`, `timestamp` |
-/// | Project Archived | `reg_arch` | `project_id`, `archived_by`, `timestamp` |
-///
-/// ## Campaign Events
-///
-/// | Event | Topic | Data Fields |
-/// |-------|-------|-------------|
-/// | Campaign Initialized | `camp_init` | `campaign_id`, `creator`, `goal`, `timestamp` |
-/// | Contribution Made | `camp_cont` | `campaign_id`, `contributor`, `amount`, `timestamp` |
-/// | Funds Withdrawn | `camp_with` | `campaign_id`, `recipient`, `amount`, `timestamp` |
-/// | Refund Issued | `camp_ref` | `campaign_id`, `contributor`, `amount`, `timestamp` |
-/// | Campaign Cancelled | `camp_can` | `campaign_id`, `cancelled_by`, `timestamp` |
-/// | Campaign Paused | `camp_pau` | `campaign_id`, `paused_by`, `timestamp` |
-/// | Campaign Resumed | `camp_res` | `campaign_id`, `resumed_by`, `timestamp` |
-///
-/// ## Dispute Events
-///
-/// | Event | Topic | Data Fields |
-/// |-------|-------|-------------|
-/// | Dispute Created | `disp_crt` | `dispute_id`, `campaign_id`, `initiator`, `reason`, `timestamp` |
-/// | Dispute Resolved | `disp_res` | `dispute_id`, `resolver`, `outcome`, `timestamp` |
-/// | Dispute Appealed | `disp_app` | `dispute_id`, `appellant`, `reason`, `timestamp` |
-///
-/// ## Milestone Events
-///
-/// | Event | Topic | Data Fields |
-/// |-------|-------|-------------|
-/// | Milestone Added | `ms_add` | `campaign_id`, `milestone_id`, `title`, `amount`, `timestamp` |
-/// | Milestone Verified | `ms_ver` | `campaign_id`, `milestone_id`, `verifier`, `timestamp` |
-/// | Milestone Released | `ms_rel` | `campaign_id`, `milestone_id`, `recipient`, `amount`, `timestamp` |
-///
-/// ## Admin Events
-///
-/// | Event | Topic | Data Fields |
-/// |-------|-------|-------------|
-/// | Admin Transferred | `adm_trf` | `old_admin`, `new_admin`, `timestamp` |
-/// | Fee Configured | `fee_cfg` | `fee_type`, `fee_rate`, `configured_by`, `timestamp` |
-///
-/// ## Governance Events
-///
-/// | Event | Topic | Data Fields |
-/// |-------|-------|-------------|
-/// | Proposal Created | `prop_crt` | `proposal_id`, `proposer`, `description`, `timestamp` |
-/// | Proposal Voted | `prop_vot` | `proposal_id`, `voter`, `support`, `weight`, `timestamp` |
-/// | Proposal Executed | `prop_exe` | `proposal_id`, `executor`, `timestamp` |
-///
-/// ## Security Events
-///
-/// | Event | Topic | Data Fields |
-/// |-------|-------|-------------|
-/// | Emergency Paused | `emrg_pau` | `paused_by`, `timestamp` |
-/// | Emergency Unpaused | `emrg_unp` | `unpaused_by`, `timestamp` |
-/// | Emergency Withdrawn | `emrg_wth` | `recipient`, `amount`, `timestamp` |
-///
-/// ## System Events
-///
-/// | Event | Topic | Data Fields |
-/// |-------|-------|-------------|
-/// | Contract Upgraded | `sys_upg` | `new_version`, `upgraded_by`, `timestamp` |
-/// | Contract Migrated | `sys_mig` | `from_version`, `to_version`, `migrated_by`, `timestamp` |
+// Event schema for indexer consumption
+//
+// All events follow this structure:
+//
+// ```json
+// {
+//   "topic": "event_name",
+//   "version": "v1",
+//   "data": {
+//     // Event-specific fields
+//   },
+//   "timestamp": 1234567890
+// }
+// ```
+//
+// ## Registry Events
+//
+// | Event | Topic | Data Fields |
+// |-------|-------|-------------|
+// | Registry Initialized | `reg_init` | `admin`, `timestamp` |
+// | Project Registered | `reg_proj` | `project_id`, `creator`, `name`, `category`, `timestamp` |
+// | Project Updated | `reg_upd` | `project_id`, `updated_by`, `timestamp` |
+// | Project Verified | `reg_ver` | `project_id`, `verifier`, `timestamp` |
+// | Project Archived | `reg_arch` | `project_id`, `archived_by`, `timestamp` |
+//
+// ## Campaign Events
+//
+// | Event | Topic | Data Fields |
+// |-------|-------|-------------|
+// | Campaign Initialized | `camp_init` | `campaign_id`, `creator`, `goal`, `timestamp` |
+// | Contribution Made | `camp_cont` | `campaign_id`, `contributor`, `amount`, `timestamp` |
+// | Funds Withdrawn | `camp_with` | `campaign_id`, `recipient`, `amount`, `timestamp` |
+// | Refund Issued | `camp_ref` | `campaign_id`, `contributor`, `amount`, `timestamp` |
+// | Campaign Cancelled | `camp_can` | `campaign_id`, `cancelled_by`, `timestamp` |
+// | Campaign Paused | `camp_pau` | `campaign_id`, `paused_by`, `timestamp` |
+// | Campaign Resumed | `camp_res` | `campaign_id`, `resumed_by`, `timestamp` |
+//
+// ## Dispute Events
+//
+// | Event | Topic | Data Fields |
+// |-------|-------|-------------|
+// | Dispute Created | `disp_crt` | `dispute_id`, `campaign_id`, `initiator`, `reason`, `timestamp` |
+// | Dispute Resolved | `disp_res` | `dispute_id`, `resolver`, `outcome`, `timestamp` |
+// | Dispute Appealed | `disp_app` | `dispute_id`, `appellant`, `reason`, `timestamp` |
+//
+// ## Milestone Events
+//
+// | Event | Topic | Data Fields |
+// |-------|-------|-------------|
+// | Milestone Added | `ms_add` | `campaign_id`, `milestone_id`, `title`, `amount`, `timestamp` |
+// | Milestone Verified | `ms_ver` | `campaign_id`, `milestone_id`, `verifier`, `timestamp` |
+// | Milestone Released | `ms_rel` | `campaign_id`, `milestone_id`, `recipient`, `amount`, `timestamp` |
+//
+// ## Admin Events
+//
+// | Event | Topic | Data Fields |
+// |-------|-------|-------------|
+// | Admin Transferred | `adm_trf` | `old_admin`, `new_admin`, `timestamp` |
+// | Fee Configured | `fee_cfg` | `fee_type`, `fee_rate`, `configured_by`, `timestamp` |
+//
+// ## Governance Events
+//
+// | Event | Topic | Data Fields |
+// |-------|-------|-------------|
+// | Proposal Created | `prop_crt` | `proposal_id`, `proposer`, `description`, `timestamp` |
+// | Proposal Voted | `prop_vot` | `proposal_id`, `voter`, `support`, `weight`, `timestamp` |
+// | Proposal Executed | `prop_exe` | `proposal_id`, `executor`, `timestamp` |
+//
+// ## Security Events
+//
+// | Event | Topic | Data Fields |
+// |-------|-------|-------------|
+// | Emergency Paused | `emrg_pau` | `paused_by`, `timestamp` |
+// | Emergency Unpaused | `emrg_unp` | `unpaused_by`, `timestamp` |
+// | Emergency Withdrawn | `emrg_wth` | `recipient`, `amount`, `timestamp` |
+//
+// ## System Events
+//
+// | Event | Topic | Data Fields |
+// |-------|-------|-------------|
+// | Contract Upgraded | `sys_upg` | `new_version`, `upgraded_by`, `timestamp` |
+// | Contract Migrated | `sys_mig` | `from_version`, `to_version`, `migrated_by`, `timestamp` |

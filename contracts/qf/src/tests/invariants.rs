@@ -1,6 +1,6 @@
 #![cfg(test)]
 use super::*;
-use soroban_sdk::{Env, Address, Map, Vec};
+use soroban_sdk::{testutils::Address as _, Address, Env, Map, Vec};
 use proptest::prelude::*;
 
 // ================================================================
@@ -23,9 +23,9 @@ proptest! {
         let mut contributor_counts = Map::new(&env);
 
         for i in 0..num_recipients {
-            let addr = Address::random(&env);
-            contributions.set(addr, contributions_per_recipient);
-            contributor_counts.set(addr, contributors_per_recipient);
+            let addr = Address::generate(&env);
+            contributions.set(addr.clone(), contributions_per_recipient);
+            contributor_counts.set(addr.clone(), contributors_per_recipient);
         }
 
         let input = QFInput {
@@ -80,9 +80,9 @@ proptest! {
         let mut contributor_counts = Map::new(&env);
 
         for i in 0..num_recipients {
-            let addr = Address::random(&env);
-            contributions.set(addr, contributions_per_recipient);
-            contributor_counts.set(addr, contributors_per_recipient);
+            let addr = Address::generate(&env);
+            contributions.set(addr.clone(), contributions_per_recipient);
+            contributor_counts.set(addr.clone(), contributors_per_recipient);
         }
 
         let input = QFInput {
@@ -123,8 +123,8 @@ proptest! {
     ) {
         let env = Env::default();
 
-        let recipient_a = Address::random(&env);
-        let recipient_b = Address::random(&env);
+        let recipient_a = Address::generate(&env);
+        let recipient_b = Address::generate(&env);
 
         // Recipient A has fewer contributions than Recipient B
         let mut contributions_a = Map::new(&env);
@@ -188,9 +188,9 @@ proptest! {
 
         // Zero contributions for all recipients
         for i in 0..num_recipients {
-            let addr = Address::random(&env);
-            contributions.set(addr, 0);
-            contributor_counts.set(addr, 0);
+            let addr = Address::generate(&env);
+            contributions.set(addr.clone(), 0);
+            contributor_counts.set(addr.clone(), 0);
         }
 
         let input = QFInput {
@@ -221,9 +221,9 @@ proptest! {
         let mut contributor_counts = Map::new(&env);
 
         for i in 0..num_recipients {
-            let addr = Address::random(&env);
-            contributions.set(addr, contributions_per_recipient);
-            contributor_counts.set(addr, contributors_per_recipient);
+            let addr = Address::generate(&env);
+            contributions.set(addr.clone(), contributions_per_recipient);
+            contributor_counts.set(addr.clone(), contributors_per_recipient);
         }
 
         let input = QFInput {
@@ -269,7 +269,7 @@ proptest! {
 #[test]
 fn test_invariant_one_recipient_full_pool() {
     let env = Env::default();
-    let recipient = Address::random(&env);
+    let recipient = Address::generate(&env);
 
     let mut contributions = Map::new(&env);
     let mut contributor_counts = Map::new(&env);
@@ -299,8 +299,8 @@ fn test_invariant_one_recipient_full_pool() {
 #[test]
 fn test_invariant_equal_contributions_equal_payouts() {
     let env = Env::default();
-    let recipient_a = Address::random(&env);
-    let recipient_b = Address::random(&env);
+    let recipient_a = Address::generate(&env);
+    let recipient_b = Address::generate(&env);
 
     let mut contributions = Map::new(&env);
     let mut contributor_counts = Map::new(&env);

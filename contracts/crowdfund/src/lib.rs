@@ -4044,89 +4044,117 @@ impl CrowdfundContract {
     pub fn add_to_denylist(env: Env, address: Address) -> Result<(), ContractError> {
         access::add_to_denylist(env, address)
     }
-
-#[test]
-fn test_no_panic_on_overflow() {
-    let env = Env::default();
-    let addr = Address::random(&env);
-
-    // Try to contribute a huge amount
-    let result = CrowdfundContract::contribute(
-        env.clone(),
-        addr.clone(),
-        i128::MAX,
-        String::from_str(&env, "XLM"),
-        None,
-    );
-    // Should return an error, not panic
-    assert!(result.is_err());
 }
 
-#[test]
-fn test_no_panic_on_uninitialized() {
-    let env = Env::default();
-    let addr = Address::random(&env);
+#[cfg(test)]
+mod panic_safety_tests {
+    use super::*;
+    use soroban_sdk::testutils::{Address as _, Ledger};
 
-    // Try to contribute to uninitialized campaign
-    let result = CrowdfundContract::contribute(
-        env.clone(),
-        addr.clone(),
-        100,
-        String::from_str(&env, "XLM"),
-        None,
-    );
-    assert!(result.is_err());
+    fn setup_client(env: &Env) -> CrowdfundContractClient<'_> {
+        env.mock_all_auths();
+        let contract_id = env.register_contract(None, CrowdfundContract);
+        CrowdfundContractClient::new(env, &contract_id)
+    }
+
+    #[test]
+    fn test_no_panic_on_overflow() {
+        let env = Env::default();
+        let client = setup_client(&env);
+        let addr = Address::generate(&env);
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract(token_admin);
+
+        env.ledger().set_timestamp(100);
+        // Initialize a valid campaign first so contribute reaches arithmetic paths.
+        client.initialize(
+            &addr,
+            &token_id,
+            &10_000,
+            &1_000_000,
+            &100,
+            &0i128,
+            &String::from_str(&env, "Title"),
+            &String::from_str(&env, "Description"),
+            &None,
+            &None,
+            &None,
+            &Category::Other,
+            &None,
+            &None,
+        );
+
+        // A huge amount must surface as a contract error, never a host panic.
+        let result =
+            client.try_contribute(&addr, &i128::MAX, &token_id, &None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_no_panic_on_uninitialized() {
+        let env = Env::default();
+        let client = setup_client(&env);
+        let addr = Address::generate(&env);
+        let token_id = Address::generate(&env);
+
+        // Contribute to an uninitialized campaign must error, not panic.
+        let result = client.try_contribute(&addr, &100, &token_id, &None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_no_panic_on_invalid_goal() {
+        let env = Env::default();
+        let client = setup_client(&env);
+        let creator = Address::generate(&env);
+        let token_id = Address::generate(&env);
+
+        env.ledger().set_timestamp(100);
+        // Zero goal is invalid and must error, not panic.
+        let result = client.try_initialize(
+            &creator,
+            &token_id,
+            &0,
+            &(env.ledger().timestamp() + 1000),
+            &0,
+            &0,
+            &String::from_str(&env, "Title"),
+            &String::from_str(&env, "Description"),
+            &None,
+            &None,
+            &None,
+            &Category::Other,
+            &None,
+            &None,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_no_panic_on_past_deadline() {
+        let env = Env::default();
+        let client = setup_client(&env);
+        let creator = Address::generate(&env);
+        let token_id = Address::generate(&env);
+
+        env.ledger().set_timestamp(10_000);
+        // Past deadline is invalid and must error, not panic.
+        let result = client.try_initialize(
+            &creator,
+            &token_id,
+            &1000,
+            &9_000,
+            &0,
+            &0,
+            &String::from_str(&env, "Title"),
+            &String::from_str(&env, "Description"),
+            &None,
+            &None,
+            &None,
+            &Category::Other,
+            &None,
+            &None,
+        );
+        assert!(result.is_err());
+    }
 }
-
-#[test]
-fn test_no_panic_on_invalid_goal() {
-    let env = Env::default();
-    let creator = Address::random(&env);
-
-    // Try to create campaign with invalid goal
-    let result = CrowdfundContract::initialize(
-        env.clone(),
-        creator.clone(),
-        Address::random(&env),
-        0, // Invalid goal
-        env.ledger().timestamp() + 1000,
-        0,
-        0,
-        String::from_str(&env, "Title"),
-        String::from_str(&env, "Description"),
-        None,
-        None,
-        None,
-        Category::Other,
-        None,
-        None,
-    );
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_no_panic_on_past_deadline() {
-    let env = Env::default();
-    let creator = Address::random(&env);
-
-    // Try to create campaign with past deadline
-    let result = CrowdfundContract::initialize(
-        env.clone(),
-        creator.clone(),
-        Address::random(&env),
-        1000,
-        env.ledger().timestamp() - 1000, // Past deadline
-        0,
-        0,
-        String::from_str(&env, "Title"),
-        String::from_str(&env, "Description"),
-        None,
-        None,
-        None,
-        Category::Other,
-        None,
-        None,
-    );
-    assert!(result.is_err());
-}
-EOF

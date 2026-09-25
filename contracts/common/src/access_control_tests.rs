@@ -26,7 +26,7 @@
 
 #[cfg(test)]
 mod tests {
-    use soroban_sdk::{testutils::Address as _, Address, Env};
+    use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
 
     use crate::AccessControl;
 
@@ -130,7 +130,7 @@ mod tests {
     /// The fact that this compiles is the meaningful assertion.
     #[test]
     fn test_access_control_is_accessible() {
-        let _ = std::mem::size_of::<AccessControl>();
+        let _ = core::mem::size_of::<AccessControl>();
     }
 
     // ── N-role scenarios ──────────────────────────────────────────────────────

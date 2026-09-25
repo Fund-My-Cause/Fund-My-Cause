@@ -55,6 +55,11 @@ impl From<common::CommonError> for ContractError {
             common::CommonError::NotFound => ContractError::KeyNotFound,
             common::CommonError::InvalidInput => ContractError::InvalidMetadata,
             common::CommonError::AlreadyExists => ContractError::AchievementAlreadyUnlocked,
+            // "Not initialised" has no dedicated variant here; the closest
+            // generic is `KeyNotFound` (a required storage key is absent).
+            common::CommonError::NotInitialized => ContractError::KeyNotFound,
+            common::CommonError::Paused => ContractError::ChallengeNotActive,
+            common::CommonError::Overflow => ContractError::InvalidAmount,
         }
     }
 }
