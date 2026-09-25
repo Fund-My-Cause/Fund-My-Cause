@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 soroban-sdk = { version = "21.0.0", default-features = false }
+common = { path = "../common" }
 
 [dev-dependencies]
 soroban-sdk = { version = "21.0.0", features = ["testutils"] }
