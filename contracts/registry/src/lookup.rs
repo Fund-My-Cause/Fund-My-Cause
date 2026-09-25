@@ -161,6 +161,9 @@ impl LookupLogic {
         caller.require_auth();
 
         let mut project = Self::get_project(env, id)?;
+        // Shared issuance guard (also used by contracts/achievements): a
+        // project can only be verified once.
+        common::IssuanceValidator::check_not_already_issued(project.verified)?;
         project.verified = true;
         project.updated_at = env.ledger().timestamp();
 
