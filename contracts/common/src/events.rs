@@ -59,6 +59,13 @@ pub mod topics {
     pub const CONTRACT_UPGRADED: Symbol = symbol_short!("sys_upg");
     pub const CONTRACT_MIGRATED: Symbol = symbol_short!("sys_mig");
     pub const CONFIGURATION_UPDATED: Symbol = symbol_short!("sys_cfg");
+
+    // ── Achievements Events ───────────────────────────────────────
+    pub const ACHIEVEMENT_UNLOCKED: Symbol = symbol_short!("ach_unl");
+    pub const ACHIEVEMENT_POINTS_AWARDED: Symbol = symbol_short!("ach_pts");
+
+    // ── Quadratic Funding Events ───────────────────────────────────
+    pub const QF_CALCULATED: Symbol = symbol_short!("qf_calc");
 }
 
 // ================================================================
@@ -486,6 +493,52 @@ impl EventEmitter {
             (from_version, to_version, migrated_by, env.ledger().timestamp()),
         );
     }
+
+    // ── Achievements Events ─────────────────────────────────────────
+
+    /// Emit achievement unlocked event
+    pub fn achievement_unlocked(
+        env: &Env,
+        user: Address,
+        achievement_type: u32,
+        points_earned: u32,
+    ) {
+        Self::emit(
+            env,
+            topics::ACHIEVEMENT_UNLOCKED,
+            (user, achievement_type, points_earned, env.ledger().timestamp()),
+        );
+    }
+
+    /// Emit achievement points awarded event
+    pub fn achievement_points_awarded(
+        env: &Env,
+        user: Address,
+        points: u32,
+        total_points: u32,
+    ) {
+        Self::emit(
+            env,
+            topics::ACHIEVEMENT_POINTS_AWARDED,
+            (user, points, total_points, env.ledger().timestamp()),
+        );
+    }
+
+    // ── Quadratic Funding Events ─────────────────────────────────────
+
+    /// Emit QF round calculated event
+    pub fn qf_calculated(
+        env: &Env,
+        total_distributed: i128,
+        remaining_pool: i128,
+        recipients_funded: u64,
+    ) {
+        Self::emit(
+            env,
+            topics::QF_CALCULATED,
+            (total_distributed, remaining_pool, recipients_funded, env.ledger().timestamp()),
+        );
+    }
 }
 
 // ================================================================
@@ -574,3 +627,16 @@ impl EventEmitter {
 /// |-------|-------|-------------|
 /// | Contract Upgraded | `sys_upg` | `new_version`, `upgraded_by`, `timestamp` |
 /// | Contract Migrated | `sys_mig` | `from_version`, `to_version`, `migrated_by`, `timestamp` |
+///
+/// ## Achievements Events
+///
+/// | Event | Topic | Data Fields |
+/// |-------|-------|-------------|
+/// | Achievement Unlocked | `ach_unl` | `user`, `achievement_type`, `points_earned`, `timestamp` |
+/// | Points Awarded | `ach_pts` | `user`, `points`, `total_points`, `timestamp` |
+///
+/// ## Quadratic Funding Events
+///
+/// | Event | Topic | Data Fields |
+/// |-------|-------|-------------|
+/// | QF Calculated | `qf_calc` | `total_distributed`, `remaining_pool`, `recipients_funded`, `timestamp` |

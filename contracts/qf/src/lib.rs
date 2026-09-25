@@ -86,6 +86,29 @@ pub enum QFError {
     Overflow = 7,
 }
 
+impl From<common::CommonError> for QFError {
+    /// Folds the shared [`common::CommonError`] variants into this crate's
+    /// own error space (see `contracts/common/src/error.rs` and
+    /// `contracts/ERROR_CONSOLIDATION.md`).
+    ///
+    /// `QuadraticFunding::calculate` is a pure, stateless computation with no
+    /// auth/init/lookup concept of its own, so there is no exact match for
+    /// most `CommonError` variants; each is mapped to the closest available
+    /// domain-specific case so a future stateful QF entry point (e.g. one
+    /// gated by `require_auth`) can reuse this conversion instead of
+    /// inventing a parallel `Unauthorized`/`NotFound` variant.
+    fn from(err: common::CommonError) -> Self {
+        match err {
+            common::CommonError::Unauthorized => QFError::InvalidPoolAmount,
+            common::CommonError::NotFound => QFError::NoContributions,
+            common::CommonError::InvalidInput => QFError::NegativeContribution,
+            common::CommonError::AlreadyInitialized => QFError::InvalidPoolAmount,
+            common::CommonError::AlreadyExists => QFError::RecipientBelowThreshold,
+            common::CommonError::NotInitialized => QFError::NoContributions,
+        }
+    }
+}
+
 // ================================================================
 // Quadratic Funding Calculator
 // ================================================================
@@ -262,7 +285,19 @@ impl QFContract {
             contributor_counts,
             min_threshold,
         };
-        QuadraticFunding::calculate(input)
+        let result = QuadraticFunding::calculate(input)?;
+
+        // Emit via the shared cross-contract event schema (contracts/common)
+        // so services/indexer can parse QF results the same way it parses
+        // crowdfund/registry/achievements events.
+        common::EventEmitter::qf_calculated(
+            &env,
+            result.total_distributed,
+            result.remaining_pool,
+            result.recipients_funded,
+        );
+
+        Ok(result)
     }
 }
 
