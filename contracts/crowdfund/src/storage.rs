@@ -184,9 +184,6 @@ pub const KEY_YIELD_CONFIG: Symbol = soroban_sdk::symbol_short!("YLDCFG");
 pub const KEY_YIELD_TOTAL: Symbol = soroban_sdk::symbol_short!("YLDTOT");
 
 // ── Issue #929: Magic Number Constants ───────────────────────────────────────
-/// Basis points denominator (10,000 basis points = 100%).
-/// Used in fee calculations: fee = amount * fee_bps / BASIS_POINTS_MAX
-pub const BASIS_POINTS_MAX: i128 = 10_000;
 
 /// Maximum message length (characters) for contribution messages.
 /// Validated when storing contribution messages to prevent unbounded storage.

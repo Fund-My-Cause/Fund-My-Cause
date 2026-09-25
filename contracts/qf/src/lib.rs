@@ -1,3 +1,38 @@
+//! # Quadratic Funding Contract
+//!
+//! A pure mathematical computation library for quadratic funding allocations.
+//!
+//! ## Authorization Model
+//!
+//! This contract has **no access control** — it is a stateless, permissionless
+//! computation library.  There are no admin-only functions, no `require_auth`
+//! calls, and no persistent storage.
+//!
+//! The authorization boundary lives entirely in the **caller contract**
+//! (`crowdfund`), which invokes `calculate_qf` as a cross-contract read-only
+//! call.  The caller is responsible for verifying that only authorized parties
+//! trigger the calculation.
+//!
+//! Per [ADR-004](../../docs/adr/ADR-004-contract-module-boundaries.md):
+//! > "qf is a pure mathematical computation library without authorization
+//! > requirements; no need for shared error handling or access control
+//! > primitives."
+//!
+//! ## Invariants
+//!
+//! - Total distributed ≤ matching pool
+//! - All payouts are non-negative
+//! - Monotonicity: More contributions → More funding
+//! - Zero contributions → Zero funding
+//!
+//! ## Formula
+//!
+//! For each recipient with total contribution C and contributor count N:
+//! ```text
+//! matching = pool × √N / Σ(√Nᵢ)
+//! total    = C + matching
+//! ```
+
 #![no_std]
 use soroban_sdk::{contract, contracttype, Address, Env, Vec, Map, String};
 
