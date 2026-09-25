@@ -10,6 +10,7 @@
 #![allow(deprecated)]
 
 mod admin;
+mod events;
 mod lookup;
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};

@@ -7,7 +7,7 @@
 //! - Fee configuration
 //! - Emergency controls
 
-use common::{EVENT_SCHEMA_VERSION};
+use crate::events::RegistryEvents;
 use soroban_sdk::{Address, Env, Vec};
 
 // ================================================================
@@ -71,11 +71,8 @@ impl AdminLogic {
         // Mark as initialized
         env.storage().set(&key, &true);
 
-        // Emit event
-        env.events().publish(
-            ("registry_initialized", "v1"),
-            (admin, fee_bps, fee_recipient),
-        );
+        // Emit event via the shared registry/common event schema.
+        RegistryEvents::initialized(env, admin);
 
         Ok(())
     }

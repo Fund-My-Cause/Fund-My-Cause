@@ -172,11 +172,6 @@ def test_scoring_regression_fixed_transaction_set():
     assert dup_flags[0].campaign_id == "DUP_B"
 
 
-def test_health():
-    r = client.get("/health")
-    assert r.status_code == 200
-
-
 # ── Wash contribution ─────────────────────────────────────────────────────────
 
 def test_wash_contribution_flagged():

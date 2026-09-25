@@ -10,6 +10,7 @@
 use soroban_sdk::{Address, Env, String, Vec};
 use common::CommonError;
 use crate::admin::AdminLogic;
+use crate::events::RegistryEvents;
 
 // ================================================================
 // Data Structures
@@ -81,11 +82,11 @@ impl LookupLogic {
         ids.push_back(id);
         env.storage().set(&list_key, &ids);
 
-        // Emit event
-        env.events().publish(
-            ("project_registered", "v1"),
-            (id, creator, name, category),
-        );
+        // Emit event via the shared registry/common event schema (see
+        // contracts/common/src/events.rs) instead of an ad-hoc tuple, so
+        // services/indexer can parse registry events the same way it parses
+        // every other contract's events.
+        RegistryEvents::project_registered(&env, id, creator, name, category);
 
         Ok(id)
     }
@@ -139,10 +140,7 @@ impl LookupLogic {
         let key = String::from_str(env, &format!("project_{}", id));
         env.storage().set(&key, &project);
 
-        env.events().publish(
-            ("project_updated", "v1"),
-            (id, caller),
-        );
+        RegistryEvents::project_updated(&env, id, caller);
 
         Ok(())
     }
@@ -161,16 +159,16 @@ impl LookupLogic {
         caller.require_auth();
 
         let mut project = Self::get_project(env, id)?;
+        // Shared issuance guard (also used by contracts/achievements): a
+        // project can only be verified once.
+        common::IssuanceValidator::check_not_already_issued(project.verified)?;
         project.verified = true;
         project.updated_at = env.ledger().timestamp();
 
         let key = String::from_str(env, &format!("project_{}", id));
         env.storage().set(&key, &project);
 
-        env.events().publish(
-            ("project_verified", "v1"),
-            (id, caller),
-        );
+        RegistryEvents::project_verified(&env, id, caller);
 
         Ok(())
     }
@@ -199,10 +197,7 @@ impl LookupLogic {
         let archived_key = String::from_str(env, &format!("project_{}_archived", id));
         env.storage().set(&archived_key, &true);
 
-        env.events().publish(
-            ("project_archived", "v1"),
-            (id, caller),
-        );
+        RegistryEvents::project_archived(&env, id, caller);
 
         Ok(())
     }
