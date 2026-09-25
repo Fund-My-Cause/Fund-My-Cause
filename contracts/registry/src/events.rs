@@ -3,10 +3,7 @@
 //! This module re-exports shared event helpers for the registry contract.
 //! All event emission should use these helpers for consistency.
 
-pub use common::events::{EventEmitter, topics};
-
-/// Re-export for backward compatibility
-pub use topics as Topics;
+use common::events::EventEmitter;
 
 /// Registry-specific event helpers
 pub struct RegistryEvents;
