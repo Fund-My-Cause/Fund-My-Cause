@@ -84,6 +84,49 @@ mod validation;
 mod views;
 mod withdraw;
 
+/// Public `pub fn` wrappers around otherwise `pub(crate)` validation logic,
+/// compiled only under the `fuzz` feature so the `contracts/crowdfund/fuzz`
+/// harness (see its README section) can drive them directly without
+/// widening the normal contract's public API.
+#[cfg(feature = "fuzz")]
+pub mod fuzz_api {
+    use crate::errors::ContractError;
+    use crate::validation;
+
+    pub fn validate_initialization(
+        goal: i128,
+        deadline: u64,
+        min_contribution: i128,
+        max_contribution: i128,
+        platform_fee_bps: Option<u32>,
+        current_time: u64,
+    ) -> Result<(), ContractError> {
+        validation::validate_initialization(
+            goal,
+            deadline,
+            min_contribution,
+            max_contribution,
+            platform_fee_bps,
+            current_time,
+        )
+    }
+
+    pub fn validate_min_contribution(
+        amount: i128,
+        min_contribution: i128,
+    ) -> Result<(), ContractError> {
+        validation::validate_min_contribution(amount, min_contribution)
+    }
+
+    pub fn validate_contributor_cap(
+        amount: i128,
+        max_contribution: i128,
+        current_contribution: i128,
+    ) -> Result<(), ContractError> {
+        validation::validate_contributor_cap(amount, max_contribution, current_contribution)
+    }
+}
+
 pub use errors::ContractError;
 pub use security::{CircuitBreaker, ContributorGate, InputValidator, RateLimiter, ReentrancyGuard};
 pub use storage::{
