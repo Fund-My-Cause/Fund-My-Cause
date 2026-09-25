@@ -39,6 +39,14 @@ const config = {
   setupFiles: ["<rootDir>/jest.polyfills.ts"],
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   transformIgnorePatterns: ["node_modules/(?!(@walletconnect|uint8arrays)/)"],
+  coverageThreshold: {
+    global: {
+      lines: 85,
+      branches: 85,
+      functions: 85,
+      statements: 85,
+    },
+  },
 };
 
 export default config;
