@@ -72,7 +72,7 @@ from fastapi import FastAPI, BackgroundTasks, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from shared_math_utils import jaccard_similarity
+from backend.shared.shared_math_utils import jaccard_similarity
 
 # ---------------------------------------------------------------------------
 # Shared DB pool config (#1128) — see backend/shared/db_config.py. Neither
