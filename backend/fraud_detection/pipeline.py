@@ -463,11 +463,6 @@ app = FastAPI(
 app.add_middleware(TraceIDMiddleware)
 
 
-@app.get("/health")
-def health() -> dict:
-    return {"status": "ok"}
-
-
 @app.get("/healthz")
 def healthz() -> dict:
     return {"status": "ok", "timestamp": time.time()}
