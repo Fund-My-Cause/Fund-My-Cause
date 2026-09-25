@@ -250,7 +250,19 @@ impl QFContract {
             contributor_counts,
             min_threshold,
         };
-        QuadraticFunding::calculate(input)
+        let result = QuadraticFunding::calculate(input)?;
+
+        // Emit via the shared cross-contract event schema (contracts/common)
+        // so services/indexer can parse QF results the same way it parses
+        // crowdfund/registry/achievements events.
+        common::EventEmitter::qf_calculated(
+            &env,
+            result.total_distributed,
+            result.remaining_pool,
+            result.recipients_funded,
+        );
+
+        Ok(result)
     }
 }
 
