@@ -8,12 +8,18 @@ import sys
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Validate that a generated WASM artifact stays under the configured size budget."
+        description="Validate that generated WASM artifacts stay under the configured size budget."
     )
     parser.add_argument(
         "--artifact",
-        required=True,
-        help="Path to the .wasm artifact to inspect.",
+        required=False,
+        default=None,
+        help="Deprecated single-artifact form. Prefer passing one or more artifact paths positionally.",
+    )
+    parser.add_argument(
+        "artifacts",
+        nargs="*",
+        help="Paths to the .wasm artifacts to inspect.",
     )
     parser.add_argument(
         "--budget",
@@ -24,16 +30,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    args = parse_args()
-    artifact = args.artifact
-
+def check_artifact(artifact: str, budget: int) -> int:
     if not os.path.exists(artifact):
         print(f"ERROR: artifact not found: {artifact}", file=sys.stderr)
         return 2
 
     size = os.path.getsize(artifact)
-    budget = args.budget
     print(f"artifact={artifact}")
     print(f"size_bytes={size}")
     print(f"budget_bytes={budget}")
@@ -47,6 +49,22 @@ def main() -> int:
 
     print("PASS: WASM artifact is within the configured size budget.")
     return 0
+
+
+def main() -> int:
+    args = parse_args()
+    artifacts = list(args.artifacts)
+    if args.artifact is not None:
+        artifacts.append(args.artifact)
+
+    if not artifacts:
+        print("ERROR: no artifacts provided.", file=sys.stderr)
+        return 2
+
+    rc = 0
+    for artifact in artifacts:
+        rc = max(rc, check_artifact(artifact, args.budget))
+    return rc
 
 
 if __name__ == "__main__":

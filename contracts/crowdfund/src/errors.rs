@@ -170,7 +170,9 @@ impl From<common::CommonError> for ContractError {
     /// | `AlreadyInitialized`    | `ContractError::AlreadyInitialized` (1) |
     /// | `AlreadyExists`         | `ContractError::InvalidGoal` (12) — closest generic |
     /// | `InvalidInput`          | `ContractError::InvalidInput` (58) |
-    /// | `NotInitialized`        | `ContractError::Unauthorized` (33) — closest generic |
+    /// | `NotInitialized`        | `ContractError::InvalidAddress` (70) |
+    /// | `Paused`                | `ContractError::CampaignPaused` (11) |
+    /// | `Overflow`              | `ContractError::Overflow` (6) |
     fn from(err: common::CommonError) -> Self {
         match err {
             common::CommonError::Unauthorized => ContractError::Unauthorized,
@@ -178,10 +180,9 @@ impl From<common::CommonError> for ContractError {
             common::CommonError::AlreadyInitialized => ContractError::AlreadyInitialized,
             common::CommonError::AlreadyExists => ContractError::InvalidGoal,
             common::CommonError::InvalidInput => ContractError::InvalidInput,
-            // crowdfund has no dedicated "not initialized" variant; the
-            // closest generic case is Unauthorized (calls before init are
-            // rejected the same way as calls without proper authorization).
-            common::CommonError::NotInitialized => ContractError::Unauthorized,
+            common::CommonError::NotInitialized => ContractError::InvalidAddress,
+            common::CommonError::Paused => ContractError::CampaignPaused,
+            common::CommonError::Overflow => ContractError::Overflow,
         }
     }
 }

@@ -238,7 +238,7 @@ fn apply_fees(
 
     let contrib_fee: i128 = if let Some(ref config) = snap.platform_config {
         if config.fee_mode == FeeMode::OnContribution {
-            let f = apply_bps(amount, config.fee_bps)?.ok_or(ContractError::Overflow)?;
+            let f = apply_bps(amount, config.fee_bps)?;
             if f > 0 {
                 token::Client::new(env, token).transfer(
                     &env.current_contract_address(),
@@ -305,7 +305,6 @@ fn apply_matching_and_total(
     let mut matched_amount = 0i128;
     if let Some(ref config) = snap.matching_config {
         let match_amount = apply_bps(effective_amount, config.match_ratio)
-            .ok_or(ContractError::Overflow)?
             .unwrap_or(0);
         let total_matched: i128 = inst.get(&DataKey::TotalMatched).unwrap_or(0);
         let available_match = config

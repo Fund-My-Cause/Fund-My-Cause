@@ -571,7 +571,7 @@ mod tests {
     #[test]
     fn test_cached_view_loads_core_fields() {
         let env = setup_env();
-        let (creator, token_id, client, _) = setup_contract(&env, None, None, Category::Education);
+        let (creator, token_id, client, _) = setup_contract(&env, None, None, Category::Technology);
 
         env.as_contract(&client.address, || {
             let v = CachedInstanceView::load(&env);
@@ -584,7 +584,7 @@ mod tests {
             assert_eq!(v.total, 0);
             assert!(v.platform_config.is_none());
             assert!(v.vesting.is_none());
-            assert!(matches!(v.category, Category::Education));
+            assert!(matches!(v.category, Category::Technology));
         });
     }
 

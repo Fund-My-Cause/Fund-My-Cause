@@ -1,4 +1,4 @@
-.PHONY: help test-contract deploy-testnet dev-frontend test-frontend lint install-deps clean format fmt-check build test docs docs-open docs-check
+.PHONY: help test-contract deploy-testnet dev-frontend test-frontend lint install-deps clean format fmt-check build size test docs docs-open docs-check
 
 # Default target - show help
 help: ## Show this help
@@ -18,6 +18,17 @@ help: ## Show this help
 build: ## Build Rust contracts to WebAssembly
 	@echo "Building Rust contracts..."
 	cargo build --release --target wasm32-unknown-unknown
+
+# Report WASM binary sizes
+size: ## Build contracts and report WASM binary sizes
+	@echo "Building contracts and checking sizes..."
+	cargo build --release --target wasm32-unknown-unknown
+	@echo ""
+	@echo "=== WASM Binary Sizes ==="
+	@ls -lh target/wasm32-unknown-unknown/release/*.wasm
+	@echo ""
+	@echo "=== Size Budget (256 KiB per contract) ==="
+	@python3 scripts/check_wasm_size.py target/wasm32-unknown-unknown/release/*.wasm
 
 # Run all tests
 test: test-contract test-frontend ## Run all tests (contracts + frontend)

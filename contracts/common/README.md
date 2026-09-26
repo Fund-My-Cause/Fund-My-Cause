@@ -96,3 +96,11 @@ The `common::math` module follows the same SemVer rules:
 - `apply_bps`, `apply_bps_saturating`, `proportional`, and `BASIS_POINTS_MAX` are stable public APIs.
 - New math utilities added will be minor version bumps if backward-compatible.
 - Changing calculation logic (e.g., rounding behavior) is a major version bump.
+
+## Formal Verification
+
+Core safety invariants for the `crowdfund` and `qf` contracts are formally specified and verified. See the [Formal Verification Specifications](../../security/formal-verification/README.md) for:
+
+- [Core Safety Invariants](../../security/formal-verification/invariants.md) — Detailed invariant definitions for crowdfund and qf
+- [TLA+ Properties](../../security/formal-verification/properties.tla) — Formal temporal logic specifications
+- Verification approach, coverage, and known limitations

@@ -1,6 +1,6 @@
 #![cfg(test)]
 use super::*;
-use soroban_sdk::{Env, Address, Map};
+use soroban_sdk::{testutils::Address as _, Address, Env, Map};
 use proptest::prelude::*;
 
 /// Property: QF calculation is deterministic
@@ -21,7 +21,7 @@ proptest! {
 
         let mut recipients = Vec::new(&env);
         for i in 0..num_recipients {
-            let addr = Address::random(&env);
+            let addr = Address::generate(&env);
             recipients.push_back(addr.clone());
             contributions1.set(addr.clone(), contrib);
             contributions2.set(addr.clone(), contrib);
@@ -76,12 +76,12 @@ proptest! {
         let mut contributor_counts = Map::new(&env);
 
         // First recipient gets contributions
-        let addr1 = Address::random(&env);
+        let addr1 = Address::generate(&env);
         contributions.set(addr1.clone(), contrib);
         contributor_counts.set(addr1.clone(), contributors);
 
         // Second recipient gets zero
-        let addr2 = Address::random(&env);
+        let addr2 = Address::generate(&env);
         contributions.set(addr2.clone(), 0);
         contributor_counts.set(addr2.clone(), 0);
 
@@ -98,9 +98,9 @@ proptest! {
             // Only the first recipient should get funding
             assert_eq!(r.recipients_funded, 1);
             // The second recipient should not be in the allocations
-            assert!(!r.allocations.contains_key(&addr2));
+            assert!(!r.allocations.contains_key(addr2.clone()));
             // The first recipient should have at least their contribution
-            let allocation = r.allocations.get(addr1).unwrap();
+            let allocation = r.allocations.get(addr1.clone()).unwrap();
             assert!(allocation >= contrib);
         }
     }
@@ -116,7 +116,7 @@ fn test_calculate_qf_rejects_zero_pool() {
     let env = Env::default();
     let mut contributions = Map::new(&env);
     let mut contributor_counts = Map::new(&env);
-    let addr = Address::random(&env);
+    let addr = Address::generate(&env);
     contributions.set(addr.clone(), 1000);
     contributor_counts.set(addr, 5);
 
@@ -136,7 +136,7 @@ fn test_calculate_qf_rejects_negative_pool() {
     let env = Env::default();
     let mut contributions = Map::new(&env);
     let mut contributor_counts = Map::new(&env);
-    let addr = Address::random(&env);
+    let addr = Address::generate(&env);
     contributions.set(addr.clone(), 1000);
     contributor_counts.set(addr, 5);
 
@@ -172,15 +172,15 @@ fn test_calculate_qf_rejects_empty_contributions() {
 #[test]
 fn test_calculate_qf_deterministic_no_replay() {
     let env = Env::default();
-    let addr1 = Address::random(&env);
-    let addr2 = Address::random(&env);
+    let addr1 = Address::generate(&env);
+    let addr2 = Address::generate(&env);
 
     let mut contributions1 = Map::new(&env);
     let mut contributor_counts1 = Map::new(&env);
     contributions1.set(addr1.clone(), 5000);
     contributions1.set(addr2.clone(), 3000);
     contributor_counts1.set(addr1.clone(), 10);
-    contributor_counts1.set(addr2, 7);
+    contributor_counts1.set(addr2.clone(), 7);
 
     let result1 = QFContract::calculate_qf(
         env.clone(),
@@ -195,7 +195,7 @@ fn test_calculate_qf_deterministic_no_replay() {
     contributions2.set(addr1.clone(), 5000);
     contributions2.set(addr2.clone(), 3000);
     contributor_counts2.set(addr1.clone(), 10);
-    contributor_counts2.set(addr2, 7);
+    contributor_counts2.set(addr2.clone(), 7);
 
     let result2 = QFContract::calculate_qf(
         env.clone(),
@@ -214,7 +214,7 @@ fn test_calculate_qf_deterministic_no_replay() {
 #[test]
 fn test_calculate_qf_below_threshold_gets_no_matching() {
     let env = Env::default();
-    let addr = Address::random(&env);
+    let addr = Address::generate(&env);
 
     let mut contributions = Map::new(&env);
     let mut contributor_counts = Map::new(&env);
@@ -240,7 +240,7 @@ fn test_calculate_qf_below_threshold_gets_no_matching() {
 #[test]
 fn test_calculate_qf_zero_contributor_count() {
     let env = Env::default();
-    let addr = Address::random(&env);
+    let addr = Address::generate(&env);
 
     let mut contributions = Map::new(&env);
     let mut contributor_counts = Map::new(&env);
@@ -265,7 +265,7 @@ fn test_calculate_qf_zero_contributor_count() {
 #[test]
 fn test_calculate_qf_negative_contribution_skipped() {
     let env = Env::default();
-    let addr = Address::random(&env);
+    let addr = Address::generate(&env);
 
     let mut contributions = Map::new(&env);
     let mut contributor_counts = Map::new(&env);

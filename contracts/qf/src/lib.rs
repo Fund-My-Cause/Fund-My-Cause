@@ -34,7 +34,7 @@
 //! ```
 
 #![no_std]
-use soroban_sdk::{contract, contracttype, Address, Env, Vec, Map, String};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Vec, Map, String};
 
 // ================================================================
 // Quadratic Funding Core Logic
@@ -74,8 +74,8 @@ pub struct QFInput {
 // QF Error Types
 // ================================================================
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
 pub enum QFError {
     InvalidPoolAmount = 1,
     NoContributions = 2,
@@ -84,6 +84,14 @@ pub enum QFError {
     NegativePayout = 5,
     RecipientBelowThreshold = 6,
     Overflow = 7,
+    /// Wrapped host error from cross-contract invocation or SDK
+    HostError = 255,
+}
+
+impl From<soroban_sdk::Error> for QFError {
+    fn from(_: soroban_sdk::Error) -> Self {
+        QFError::HostError
+    }
 }
 
 impl From<common::CommonError> for QFError {
@@ -172,7 +180,7 @@ impl QuadraticFunding {
 
         // Collect valid recipients that meet threshold
         for (recipient, contrib) in input.contributions.iter() {
-            let contributor_count = input.contributor_counts.get(recipient).unwrap_or(0);
+            let contributor_count = input.contributor_counts.get(recipient.clone()).unwrap_or(0);
 
             // Invariant: No negative payouts
             // Skip recipients with zero contributions or below threshold
@@ -184,7 +192,7 @@ impl QuadraticFunding {
                 continue;
             }
 
-            let sqrt = sqrt_values.get(recipient).unwrap_or(0);
+            let sqrt = sqrt_values.get(recipient.clone()).unwrap_or(0);
             if sqrt == 0 {
                 continue;
             }
@@ -302,4 +310,8 @@ impl QFContract {
 }
 
 #[cfg(test)]
-mod tests;
+#[path = "tests/qf_tests.rs"]
+mod qf_tests;
+#[cfg(test)]
+#[path = "tests/invariants.rs"]
+mod invariants_tests;
