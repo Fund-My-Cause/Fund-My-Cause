@@ -1,69 +1,28 @@
-# Per-Event-Type Processor Registry — services/indexer
+# Per-Event-Type Processor Registry
 
-## Background
+`EventDispatcher` keeps a `Map<string, EventHandler>` keyed by event topic.
+It groups each incoming batch by topic and invokes the matching handler once
+per group. Aliases on a handler preserve support for older topic names.
 
-`IMPLEMENTATION_NOTES.md` flagged the risk of a growing monolithic on-chain
-event handler. This document records the split into per-contract-event
-processors and the registry-based dispatch that replaces a single large
-switch/if-else handler.
+| Contract family | Canonical topic | Handler |
+| --- | --- | --- |
+| Crowdfund | `campaign` | `handlers/crowdfund/campaign.handler.ts` |
+| Crowdfund | `donation` | `handlers/crowdfund/donation.handler.ts` (`Contribute` alias) |
+| Crowdfund | `achievement` | `handlers/crowdfund/achievement.handler.ts` |
+| QF | `qf_calc` | `handlers/qf/calculated.handler.ts` (`qf_calculated` alias) |
+| Achievements | `ach_unl` | `handlers/achievements/unlocked.handler.ts` |
+| Achievements | `ach_pts` | `handlers/achievements/points-awarded.handler.ts` |
+| Registry | `reg_proj` | `handlers/registry/registered.handler.ts` (`registered` and `project_registered` aliases) |
 
-## Processor Modules
+Handlers persist the original `IndexerEvent` objects through the shared
+repository; they do not reshape the indexed data. Their co-located tests use
+decoded event fixtures, and `handlers/dispatcher.test.ts` covers canonical
+topic routing, legacy aliases, and unknown topics.
 
-Each contract event family now has an isolated processor module under
-`src/handlers/`:
+Unknown event types are logged and sent directly to the fallback repository,
+so adding processors does not change indexed output or discard events that
+do not yet have domain-specific handling.
 
-| Event family  | Module                                              | Responsibility                                   |
-|---------------|------------------------------------------------------|---------------------------------------------------|
-| Crowdfund     | `handlers/crowdfund/campaign.handler.ts`             | Campaign created/updated/closed events            |
-| Crowdfund     | `handlers/crowdfund/donation.handler.ts`             | Donation received/refunded events                 |
-| Crowdfund     | `handlers/crowdfund/achievement.handler.ts`          | Achievement/milestone unlock events                |
-| QF            | `handlers/qf/` (see module)                          | Quadratic-funding round contribution/match events |
-| Registry      | `handlers/registry/registered.handler.ts`            | Project/org registration events                    |
-| Achievements  | `handlers/crowdfund/achievement.handler.ts`          | Shared with crowdfund achievement events           |
-
-Each processor module exports a pure function of the shape
-`(event: RawContractEvent) => Promise<IndexedRecord[]>` (see
-`handlers/types.ts`), so it can be unit tested against recorded sample
-events without a live RPC connection or database.
-
-## Registry-Based Dispatch
-
-`handlers/dispatcher.ts` holds a `Map<EventType, EventProcessor>` keyed by
-the normalized event type/topic signature. `handlers/index.ts` registers
-each processor module against the map at startup:
-
-```ts
-registry.register("CampaignCreated", campaignHandler.process);
-registry.register("DonationReceived", donationHandler.process);
-registry.register("AchievementUnlocked", achievementHandler.process);
-registry.register("ProjectRegistered", registeredHandler.process);
-```
-
-Dispatch for an incoming event is a single lookup:
-
-```ts
-const processor = registry.resolve(event.type);
-if (!processor) {
-  // unknown event type — logged and skipped, does not throw
-  return { skipped: true, reason: "unregistered-event-type" };
-}
-return processor(event);
-```
-
-## Unit Test Coverage
-
-- Each processor has a co-located `*.handler.test.ts` exercising it against
-  recorded sample events (fixtures capture real decoded event payloads from
-  each contract family).
-- `handlers/dispatcher.test.ts` covers registry-based dispatch, including a
-  case for an **unknown event type**, asserting the dispatcher returns a
-  `skipped` result rather than throwing, so unrecognized future event types
-  degrade gracefully instead of crashing the indexer loop.
-
-## Behavioral Guarantee
-
-No change in indexed data output for existing sample events: the processor
-functions are extracted 1:1 from the previous monolithic handler logic, and
-the existing indexer integration tests (`ingestion.integration.test.ts`,
-`consistency.integration.test.ts`) assert against the same fixture set as
-before the split, with identical expected output rows.
+The RPC client subscribes to configured contract IDs. `CROWDFUND_CONTRACT_ID`
+is the primary ID; `REGISTRY_CONTRACT_ID`, `QF_CONTRACT_ID`, and
+`ACHIEVEMENTS_CONTRACT_ID` are optional.
