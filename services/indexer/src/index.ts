@@ -5,6 +5,17 @@ import { SorobanRPCClient } from "./rpc-client.js";
 import { HealthChecker } from "./health-checker.js";
 import { EventStore } from "./event-store.js";
 import {
+  AchievementHandler,
+  AchievementPointsAwardedHandler,
+  AchievementUnlockedHandler,
+  CampaignHandler,
+  DonationHandler,
+  EventDispatcher,
+  QFCalculatedHandler,
+  RegisteredHandler,
+} from "./handlers/index.js";
+import type { EventHandler } from "./handlers/index.js";
+import {
   buildPage,
   resolvePaginationArgs,
   CursorDecodeError,
@@ -18,7 +29,14 @@ const CONTRACT_ID = process.env.CROWDFUND_CONTRACT_ID ?? "";
 // Registry contract ID (#1125) — optional. When set, the RPC client also
 // subscribes to registry contract events (routed to handlers/registry/*).
 const REGISTRY_CONTRACT_ID = process.env.REGISTRY_CONTRACT_ID ?? "";
-const CONTRACT_IDS = [CONTRACT_ID, REGISTRY_CONTRACT_ID].filter(
+const QF_CONTRACT_ID = process.env.QF_CONTRACT_ID ?? "";
+const ACHIEVEMENTS_CONTRACT_ID = process.env.ACHIEVEMENTS_CONTRACT_ID ?? "";
+const CONTRACT_IDS = [
+  CONTRACT_ID,
+  REGISTRY_CONTRACT_ID,
+  QF_CONTRACT_ID,
+  ACHIEVEMENTS_CONTRACT_ID,
+].filter(
   (id): id is string => id.length > 0,
 );
 const LOG_LEVEL = process.env.LOG_LEVEL ?? "info";
@@ -69,6 +87,9 @@ const handlers: EventHandler[] = [
   new CampaignHandler(logger),
   new DonationHandler(logger),
   new AchievementHandler(logger),
+  new QFCalculatedHandler(logger),
+  new AchievementUnlockedHandler(logger),
+  new AchievementPointsAwardedHandler(logger),
   new RegisteredHandler(logger),
 ];
 const dispatcher = new EventDispatcher(handlers, eventRepository, logger);
