@@ -61,6 +61,14 @@
     "./error-boundary": {
       "import": "./src/ErrorBoundary.entry.ts",
       "types": "./src/ErrorBoundary.entry.ts"
+    },
+    "./empty-state": {
+      "import": "./src/EmptyState.entry.ts",
+      "types": "./src/EmptyState.entry.ts"
+    },
+    "./error-state": {
+      "import": "./src/ErrorState.entry.ts",
+      "types": "./src/ErrorState.entry.ts"
     }
   },
   "scripts": {
