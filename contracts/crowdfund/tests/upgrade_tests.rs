@@ -1,4 +1,7 @@
 #![cfg(test)]
+// Test harness still uses the deprecated `register_contract` /
+// `register_stellar_asset_contract` helpers; migrating them is separate work.
+#![allow(deprecated)]
 
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
@@ -48,6 +51,37 @@ fn setup_campaign(
 }
 
 // ── #448: Upgrade test suite ─────────────────────────────────────────────────
+
+#[test]
+fn test_upgrade_requires_admin_auth() {
+    let env = Env::default();
+    let creator = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_id = env.register_stellar_asset_contract(token_admin);
+    let contract_id = env.register_contract(None, CrowdfundContract);
+    let client = CrowdfundContractClient::new(&env, &contract_id);
+
+    env.ledger().set_timestamp(100);
+    client.initialize(
+        &creator,
+        &token_id,
+        &10_000,
+        &1_000_000,
+        &100,
+        &0i128,
+        &String::from_str(&env, "Upgrade Auth"),
+        &String::from_str(&env, "Requires admin auth"),
+        &None,
+        &None,
+        &None,
+        &Category::Other,
+        &None,
+        &None,
+    );
+
+    let result = client.try_migrate_version();
+    assert!(result.is_err(), "unauthorized upgrade should be rejected");
+}
 
 #[test]
 fn test_upgrade_preserves_state() {
@@ -176,7 +210,7 @@ fn test_state_migration_metadata_versioning() {
 
     // Metadata version history should have entries
     let history = client.get_metadata_history();
-    assert!(history.len() >= 1);
+    assert!(!history.is_empty());
 }
 
 #[test]
