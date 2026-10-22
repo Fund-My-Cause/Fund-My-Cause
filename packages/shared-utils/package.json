@@ -21,6 +21,10 @@
     "./timestamps": {
       "import": "./src/timestamps.ts",
       "types": "./src/timestamps.ts"
+    },
+    "./db-config": {
+      "import": "./src/db-config.ts",
+      "types": "./src/db-config.ts"
     }
   },
   "scripts": {
