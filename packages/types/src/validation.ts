@@ -302,7 +302,7 @@ export function stringFieldSchema(
  * Build a schema for an object whose fields are each validated by a
  * per-field schema. Field-level errors are collected into `fieldErrors`.
  */
-export function objectSchema<T extends Record<string, unknown>>(
+export function objectSchema<T extends object>(
   shape: { [K in keyof T]: ValidationSchema<T[K]> },
 ): ValidationSchema<T> {
   const run = (input: unknown): ValidationResult<T> => {
