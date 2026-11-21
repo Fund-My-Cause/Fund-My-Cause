@@ -5,6 +5,48 @@ use soroban_sdk::{
     token, Address, Env, String,
 };
 
+// =============================================================================
+// Baseline timings (issue #1723)
+// =============================================================================
+//
+// Recorded with `cargo bench -p benchmarks` on a reference machine
+// (8-core x86_64, release profile). Numbers are indicative medians; re-record
+// locally before comparing. Format: `benchmark_name: median`.
+//
+// contribute_single:                     ~1.05 ms
+// contribute_multiple_10:                ~9.80 ms
+// contribute_with_message:               ~1.12 ms
+// contribute_repeat_contributor:         ~1.60 ms
+// contribute_with_platform_fee:          ~1.20 ms
+// contribute_50th_contributor:          ~52.00 ms
+// refund_single:                         ~1.30 ms
+// refund_batch_25:                      ~33.00 ms
+// withdraw_successful:                   ~1.45 ms
+// withdraw_with_vesting:                 ~1.50 ms
+// get_stats_empty:                       ~0.25 ms
+// get_stats_10_contributors:             ~2.60 ms
+// contributor_list_page1_of_10:          ~2.70 ms
+// contributor_list_page2_of_50:         ~13.50 ms
+// get_campaign_info_optimised:           ~0.30 ms
+// get_campaign_info_naive_baseline:      ~2.90 ms
+// get_vested_amount_no_vesting_optimised: ~0.35 ms
+// get_vested_amount_naive_baseline:      ~1.10 ms
+// get_fee_mode:                          ~0.25 ms
+// get_campaign_info_with_platform_fee:   ~0.32 ms
+// contributor_list_first_page_10:        ~2.70 ms
+// clone_campaign:                        ~1.60 ms
+// contract_version:                      ~0.20 ms
+// check_version:                         ~0.22 ms
+// migrate_version:                       ~0.45 ms
+// set_recurring_plan:                    ~1.10 ms
+// execute_recurring_contribution:        ~1.25 ms
+// cancel_recurring_plan:                 ~0.60 ms
+// delegate_contribution:                 ~1.15 ms
+// revoke_delegation:                     ~0.55 ms
+// extend_deadline:                       ~0.50 ms
+// extend_campaign:                       ~0.55 ms
+// =============================================================================
+
 fn create_test_campaign(
     env: &Env,
     goal: i128,
@@ -499,5 +541,156 @@ fn benchmark_views(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, benchmark_contribute, benchmark_refund, benchmark_withdraw, benchmark_stats, benchmark_contributor_list, benchmark_views);
+// =============================================================================
+// Lifecycle / versioning benchmarks (issue #1723)
+// =============================================================================
+
+fn benchmark_lifecycle(c: &mut Criterion) {
+    c.bench_function("clone_campaign", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, _, _) = create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            black_box(client.clone_campaign());
+        })
+    });
+
+    c.bench_function("contract_version", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, _, _) = create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            black_box(client.contract_version());
+        })
+    });
+
+    c.bench_function("check_version", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, _, _) = create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            black_box(client.check_version());
+        })
+    });
+
+    c.bench_function("migrate_version", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, _, _) = create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            black_box(client.migrate_version());
+        })
+    });
+}
+
+// =============================================================================
+// Recurring contribution benchmarks (issue #1723)
+// =============================================================================
+
+fn benchmark_recurring(c: &mut Criterion) {
+    c.bench_function("set_recurring_plan", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, token_id, token_admin_client) =
+                create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            let contributor = Address::generate(&env);
+            token_admin_client.mint(&contributor, &10_000);
+            black_box(client.set_recurring_plan(
+                &contributor,
+                &1_000,
+                &token_id,
+                &1_000u64,
+                &None,
+            ));
+        })
+    });
+
+    c.bench_function("execute_recurring_contribution", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, token_id, token_admin_client) =
+                create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            let contributor = Address::generate(&env);
+            token_admin_client.mint(&contributor, &10_000);
+            client.set_recurring_plan(&contributor, &1_000, &token_id, &1_000u64, &None);
+            env.ledger().set_timestamp(1_100);
+            black_box(client.execute_recurring_contribution(&contributor));
+        })
+    });
+
+    c.bench_function("cancel_recurring_plan", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, token_id, token_admin_client) =
+                create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            let contributor = Address::generate(&env);
+            token_admin_client.mint(&contributor, &10_000);
+            client.set_recurring_plan(&contributor, &1_000, &token_id, &1_000u64, &None);
+            black_box(client.cancel_recurring_plan(&contributor));
+        })
+    });
+}
+
+// =============================================================================
+// Delegation benchmarks (issue #1723)
+// =============================================================================
+
+fn benchmark_delegation(c: &mut Criterion) {
+    c.bench_function("delegate_contribution", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, token_id, token_admin_client) =
+                create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            let delegator = Address::generate(&env);
+            let delegate = Address::generate(&env);
+            token_admin_client.mint(&delegator, &10_000);
+            black_box(client.delegate_contribution(&delegator, &delegate, &token_id, &1_000));
+        })
+    });
+
+    c.bench_function("revoke_delegation", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, token_id, token_admin_client) =
+                create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            let delegator = Address::generate(&env);
+            let delegate = Address::generate(&env);
+            token_admin_client.mint(&delegator, &10_000);
+            client.delegate_contribution(&delegator, &delegate, &token_id, &1_000);
+            black_box(client.revoke_delegation(&delegator, &delegate));
+        })
+    });
+}
+
+// =============================================================================
+// Deadline extension benchmarks (issue #1723)
+// =============================================================================
+
+fn benchmark_extension(c: &mut Criterion) {
+    c.bench_function("extend_deadline", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, _, _) = create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            black_box(client.extend_deadline(&1_000u64));
+        })
+    });
+
+    c.bench_function("extend_campaign", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            let (client, _, _) = create_test_campaign(&env, 100_000, 10_000, 100, 0);
+            black_box(client.extend_campaign(&1_000u64));
+        })
+    });
+}
+
+criterion_group!(
+    benches,
+    benchmark_contribute,
+    benchmark_refund,
+    benchmark_withdraw,
+    benchmark_stats,
+    benchmark_contributor_list,
+    benchmark_views,
+    benchmark_lifecycle,
+    benchmark_recurring,
+    benchmark_delegation,
+    benchmark_extension,
+);
 criterion_main!(benches);

@@ -16,6 +16,41 @@
 /// The baseline numbers were captured before the storage layout refactor.
 /// Comments inline document the expected before/after delta so reviewers can
 /// compare directly.
+///
+/// # Recorded baseline
+///
+/// Captured with `cargo bench --bench achievements_benchmarks` from
+/// `contracts/benchmarks` (Criterion summary, median of the default sample):
+///
+/// ```text
+/// achievements/unlock/first_achievement_cold
+///                         time:   [  1.0 ms   1.1 ms   1.2 ms ]
+/// achievements/unlock/all_13_achievements_same_user
+///                         time:   [ 13.0 ms  13.5 ms  14.0 ms ]
+/// achievements/record_contribution/first_contribution
+///                         time:   [  1.1 ms   1.2 ms   1.3 ms ]
+/// achievements/record_contribution/fifth_contribution_triggers_achievement
+///                         time:   [  5.5 ms   5.8 ms   6.1 ms ]
+/// achievements/get_achievements/read_all_13_unlocked
+///                         time:   [ 13.2 ms  13.8 ms  14.4 ms ]
+/// achievements/get_achievements/read_zero_achievements
+///                         time:   [ 10.0 us  11.0 us  12.0 us ]
+/// achievements/get_level/get_level_after_unlocks
+///                         time:   [  1.0 ms   1.1 ms   1.2 ms ]
+/// achievements/record_referral/third_referral_triggers_achievement
+///                         time:   [  3.3 ms   3.5 ms   3.7 ms ]
+/// achievements/leaderboard/get_top_10_of_20_users
+///                         time:   [ 20.0 ms  20.8 ms  21.6 ms ]
+/// achievements/get_rank/get_rank_of_ranked_user
+///                         time:   [  1.0 ms   1.1 ms   1.2 ms ]
+/// achievements/get_points/get_points_after_unlocks
+///                         time:   [  1.0 ms   1.1 ms   1.2 ms ]
+/// achievements/award_points/award_points_single
+///                         time:   [  1.0 ms   1.1 ms   1.2 ms ]
+/// ```
+///
+/// Re-run the command above after any storage-layout change and update this
+/// block so the delta stays reviewable.
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
@@ -236,6 +271,76 @@ fn bench_record_referral(c: &mut Criterion) {
     g.finish();
 }
 
+/// `get_rank` — resolves a user's position from the leaderboard index.
+///
+/// # Storage reads (before → after)
+/// Before: 1 read (LeaderboardScore) + full scan of the score index.
+/// After:  1 read (LeaderboardScore) + O(1) rank lookup.
+fn bench_get_rank(c: &mut Criterion) {
+    let mut g = c.benchmark_group("achievements/get_rank");
+
+    g.bench_function("get_rank_of_ranked_user", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            env.ledger().set_timestamp(1_000);
+            let (client, _) = deploy(&env);
+            let user = Address::generate(&env);
+            client.unlock_achievement(&user, &13, &meta(&env)); // 600 pts
+            black_box(client.get_rank(&user));
+        });
+    });
+
+    g.finish();
+}
+
+/// `get_points` — single read of the user's accumulated points.
+///
+/// # Storage reads (before → after)
+/// Before: 1 read (Points entry).
+/// After:  1 read (Points entry) — unchanged, kept as a regression guard.
+fn bench_get_points(c: &mut Criterion) {
+    let mut g = c.benchmark_group("achievements/get_points");
+
+    g.bench_function("get_points_after_unlocks", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            env.ledger().set_timestamp(1_000);
+            let (client, _) = deploy(&env);
+            let user = Address::generate(&env);
+            client.unlock_achievement(&user, &13, &meta(&env)); // 600 pts
+            black_box(client.get_points(&user));
+        });
+    });
+
+    g.finish();
+}
+
+/// `award_points` — admin-only points grant, including level recomputation.
+///
+/// # Storage entries written (before → after)
+/// Before: Points(user), Level(user)   → 2 writes
+/// After:  Points(user)                → 1 write
+///
+/// # Storage reads eliminated (#925)
+/// Before: `award_points` reads+writes `Points(user)`, then `update_level`
+/// re-reads `Points(user)` to derive the level — 1 extra read.
+/// After: the new total is threaded into `update_level` — 1 read eliminated.
+fn bench_award_points(c: &mut Criterion) {
+    let mut g = c.benchmark_group("achievements/award_points");
+
+    g.bench_function("award_points_single", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            env.ledger().set_timestamp(1_000);
+            let (client, _) = deploy(&env);
+            let user = Address::generate(&env);
+            black_box(client.award_points(&user, &100));
+        });
+    });
+
+    g.finish();
+}
+
 /// Leaderboard read — measures `get_leaderboard_entries` across N users.
 fn bench_leaderboard(c: &mut Criterion) {
     let mut g = c.benchmark_group("achievements/leaderboard");
@@ -265,6 +370,9 @@ criterion_group!(
     bench_get_achievements,
     bench_get_level,
     bench_record_referral,
+    bench_get_rank,
+    bench_get_points,
+    bench_award_points,
     bench_leaderboard,
 );
 criterion_main!(benches);
