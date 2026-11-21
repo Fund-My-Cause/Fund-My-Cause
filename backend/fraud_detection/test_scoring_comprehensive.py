@@ -107,6 +107,13 @@ class TestLayerBoundaries:
 class TestRepositoryLayer:
     """Tests for the repository storage and retrieval layer."""
 
+    def test_per_test_isolation_allows_mutation(self):
+        append_contribution(ContributionEvent("isolated", "G1", 100, 1.0))
+        assert len(get_contributions()) == 1
+
+    def test_per_test_isolation_clears_previous_mutation(self):
+        assert get_contributions() == []
+
     def test_append_and_read_contributions(self):
         append_contribution(ContributionEvent("c1", "GW1", 1000, 1.0))
         append_contribution(ContributionEvent("c2", "GW2", 2000, 2.0))
