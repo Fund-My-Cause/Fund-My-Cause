@@ -11,11 +11,11 @@ use soroban_sdk::{token, Address, Env};
 use crate::{
     access::auth_admin,
     errors::ContractError,
-    helpers::require_auth_creator,
+    helpers::{now, require_auth_creator},
     storage::{
-        DataKey, KEY_ADMIN, KEY_CREATOR, KEY_DEADLINE, KEY_GOAL, KEY_PLATFORM, KEY_RELEASED,
-        KEY_SOFT_CAP, KEY_STATUS, KEY_STREAM, KEY_TOKEN, KEY_TOTAL, KEY_VESTING,
-        TTL_INSTANCE_EXTEND_MAX, TTL_INSTANCE_EXTEND_MIN,
+        DataKey, KEY_DEADLINE, KEY_GOAL, KEY_PLATFORM, KEY_RELEASED, KEY_SOFT_CAP, KEY_STATUS,
+        KEY_STREAM, KEY_TOKEN, KEY_TOTAL, KEY_VESTING, TTL_INSTANCE_EXTEND_MAX,
+        TTL_INSTANCE_EXTEND_MIN,
     },
     types::{
         EventStreamClaimed, EventWithdrawn, FeeMode, MatchingConfig, PlatformConfig, Status,
@@ -107,7 +107,7 @@ pub(crate) fn withdraw(env: Env) -> Result<(), ContractError> {
         return Err(ContractError::NotActive);
     }
 
-    let now = env.ledger().timestamp();
+    let now = now(&env);
     validate_deadline_passed(now, deadline)?;
     if total < success_threshold {
         return Err(ContractError::GoalNotReached);
@@ -170,7 +170,7 @@ pub(crate) fn set_stream_config(
     let inst = env.storage().instance();
     require_auth_creator(&env)?;
 
-    let now = env.ledger().timestamp();
+    let now = now(&env);
     if start_time <= now || end_time <= start_time {
         return Err(ContractError::InvalidInput);
     }
@@ -194,7 +194,6 @@ pub(crate) fn set_stream_config(
 
 /// Claims the portion of streamed funds that has unlocked since the last claim.
 pub(crate) fn claim_stream(env: Env) -> Result<(), ContractError> {
-    let inst = env.storage().instance();
     let creator = require_auth_creator(&env)?;
     let inst = env.storage().instance();
 
@@ -202,7 +201,7 @@ pub(crate) fn claim_stream(env: Env) -> Result<(), ContractError> {
         .get(&KEY_STREAM)
         .ok_or(ContractError::StreamNotConfigured)?;
 
-    let now = env.ledger().timestamp();
+    let now = now(&env);
     let deadline: u64 = inst.get(&KEY_DEADLINE).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
     let goal: i128 = inst.get(&KEY_GOAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
     let total: i128 = inst.get(&KEY_TOTAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
@@ -217,6 +216,12 @@ pub(crate) fn claim_stream(env: Env) -> Result<(), ContractError> {
     }
     if now < stream.start_time {
         return Err(ContractError::StreamNotYetClaimable);
+    }
+
+    // Nothing left to stream out: the campaign raised no funds (or they were
+    // already fully released), so there is no claimable balance.
+    if total <= 0 {
+        return Err(ContractError::StreamFullyClaimed);
     }
 
     // Compute vested fraction linearly between start_time and end_time
@@ -245,6 +250,9 @@ pub(crate) fn claim_stream(env: Env) -> Result<(), ContractError> {
     };
 
     let payout = claimable.checked_sub(fee).ok_or(ContractError::Overflow)?;
+    if payout <= 0 {
+        return Err(ContractError::AmountNotPositive);
+    }
     token_client.transfer(&env.current_contract_address(), &creator, &payout);
 
     stream.claimed = stream

@@ -13,6 +13,41 @@ output-dir = "target/doc"
 [workspace.dependencies]
 soroban-sdk = "25.3.0"
 
+# Workspace-wide lint policy.
+#
+# Each contract crate opts in by adding the following to its Cargo.toml:
+#
+#   [lints]
+#   workspace = true
+#
+# This keeps lint configuration centralized and consistent across all
+# contracts while allowing individual crates to opt in explicitly.
+#
+# Policy:
+# - Rust warnings are denied so that any compiler warning fails the build.
+# - Clippy's `pedantic` group is enabled to catch maintainability issues.
+# - A small set of pedantic lints that are noisy or not meaningful for
+#   on-chain contract code are explicitly allowed below.
+[workspace.lints.rust]
+warnings = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+# `missing_errors_doc` / `missing_panics_doc` are overly noisy for internal
+# contract helpers; document behavior where it matters instead.
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+# Numeric casts are common and intentional in contract arithmetic.
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+# Module-level docs are not required for every internal module.
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+# Contract entry points are exported and used externally; allow unused self.
+unused_self = "allow"
+
 [profile.release]
 # Optimized for minimal WASM binary size:
 # opt-level="z" minimizes code size; lto eliminates dead code; codegen-units=1

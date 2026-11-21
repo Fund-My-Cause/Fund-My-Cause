@@ -14,6 +14,7 @@ use soroban_sdk::{token, Address, Env, String, Vec};
 
 use crate::{
     errors::ContractError,
+    helpers,
     storage::{
         DataKey, KEY_DEADLINE, KEY_GROSS_TOTAL, KEY_INSURANCE,
         KEY_INSURANCE_POOL, KEY_MAX, KEY_MIN, KEY_PLATFORM, KEY_RATE_LIMIT, KEY_STATUS, KEY_TOKEN,
@@ -516,7 +517,7 @@ pub(crate) fn contribute(
     }
 
     let snap = read_campaign_snapshot(&env);
-    let now = env.ledger().timestamp();
+    let now = helpers::now(&env);
 
     let prev_contrib = validate_preconditions(&env, &snap, &contributor, amount, now)?;
     check_access(&env, &snap, &contributor)?;
@@ -671,7 +672,7 @@ pub(crate) fn contribute_on_behalf(
         return Err(ContractError::NotActive);
     }
 
-    validate_deadline_not_passed(env.ledger().timestamp(), deadline)?;
+    validate_deadline_not_passed(helpers::now(&env), deadline)?;
 
     // ── Per-contributor cap (#927: this path previously never enforced ────
     // the campaign's per-contributor max_contribution at all — only the

@@ -217,6 +217,365 @@ fn invalid_platform_fee_is_rejected() {
     assert_eq!(result.err(), Some(Ok(ContractError::InvalidFee)));
 }
 
+// ── Deadline boundary tests (#1718) ──────────────────────────────────────────
+//
+// The contract treats a campaign as active while `ledger.timestamp < deadline`
+// and expired once `ledger.timestamp >= deadline`. These tests pin that
+// behaviour at `deadline - 1`, `deadline` and `deadline + 1` for the
+// contribute / refund / withdraw paths.
+
+#[test]
+fn contribute_at_deadline_minus_one_succeeds() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 10_000, 100);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &500);
+
+    env.ledger().set_timestamp(deadline - 1);
+    client.contribute(&contributor, &500, &token_id, &None);
+    assert_eq!(client.contribution(&contributor), 500);
+}
+
+#[test]
+fn contribute_at_deadline_is_rejected() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 10_000, 100);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &500);
+
+    env.ledger().set_timestamp(deadline);
+    let result = client.try_contribute(&contributor, &500, &token_id, &None);
+    assert_eq!(result.err(), Some(Ok(ContractError::CampaignEnded)));
+}
+
+#[test]
+fn contribute_after_deadline_is_rejected() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 10_000, 100);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &500);
+
+    env.ledger().set_timestamp(deadline + 1);
+    let result = client.try_contribute(&contributor, &500, &token_id, &None);
+    assert_eq!(result.err(), Some(Ok(ContractError::CampaignEnded)));
+}
+
+#[test]
+fn refund_at_deadline_minus_one_is_rejected() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 10_000, 100);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &500);
+    client.contribute(&contributor, &500, &token_id, &None);
+
+    // Campaign still active one second before the deadline.
+    env.ledger().set_timestamp(deadline - 1);
+    let result = client.try_refund_single(&contributor);
+    assert_eq!(result.err(), Some(Ok(ContractError::CampaignStillActive)));
+}
+
+#[test]
+fn refund_at_deadline_succeeds_when_goal_not_reached() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 10_000, 100);
+
+    let contributor = Address::generate(&env);
+    let token_client = token::Client::new(&env, &token_id);
+    token_admin_client.mint(&contributor, &500);
+    client.contribute(&contributor, &500, &token_id, &None);
+
+    env.ledger().set_timestamp(deadline);
+    client.refund_single(&contributor);
+
+    assert_eq!(client.contribution(&contributor), 0);
+    assert_eq!(token_client.balance(&contributor), 500);
+}
+
+#[test]
+fn refund_after_deadline_succeeds_when_goal_not_reached() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 10_000, 100);
+
+    let contributor = Address::generate(&env);
+    let token_client = token::Client::new(&env, &token_id);
+    token_admin_client.mint(&contributor, &500);
+    client.contribute(&contributor, &500, &token_id, &None);
+
+    env.ledger().set_timestamp(deadline + 1);
+    client.refund_single(&contributor);
+
+    assert_eq!(client.contribution(&contributor), 0);
+    assert_eq!(token_client.balance(&contributor), 500);
+}
+
+#[test]
+fn withdraw_at_deadline_minus_one_is_rejected() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 500, 100);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &500);
+    client.contribute(&contributor, &500, &token_id, &None);
+
+    env.ledger().set_timestamp(deadline - 1);
+    let result = client.try_withdraw();
+    assert_eq!(result.err(), Some(Ok(ContractError::CampaignStillActive)));
+}
+
+#[test]
+fn withdraw_at_deadline_succeeds_when_goal_reached() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 500, 100);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &500);
+    client.contribute(&contributor, &500, &token_id, &None);
+
+    env.ledger().set_timestamp(deadline);
+    client.withdraw();
+
+    let token_client = token::Client::new(&env, &token_id);
+    assert_eq!(token_client.balance(&creator), 500);
+    assert_eq!(client.status(), Status::Successful);
+}
+
+#[test]
+fn withdraw_after_deadline_succeeds_when_goal_reached() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 500, 100);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &500);
+    client.contribute(&contributor, &500, &token_id, &None);
+
+    env.ledger().set_timestamp(deadline + 1);
+    client.withdraw();
+
+    let token_client = token::Client::new(&env, &token_id);
+    assert_eq!(token_client.balance(&creator), 500);
+    assert_eq!(client.status(), Status::Successful);
+}
+
+// ── Refund / withdrawal edge cases (#1719) ───────────────────────────────────
+
+#[test]
+fn refund_single_with_zero_contribution_is_rejected() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, _token_id, client, _) = setup_contract(&env, deadline, 10_000, 100);
+
+    let stranger = Address::generate(&env);
+    env.ledger().set_timestamp(deadline + 1);
+
+    let result = client.try_refund_single(&stranger);
+    assert_eq!(result.err(), Some(Ok(ContractError::NothingToRefund)));
+}
+
+#[test]
+fn refund_single_repeated_call_is_rejected() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 10_000, 100);
+
+    let contributor = Address::generate(&env);
+    let token_client = token::Client::new(&env, &token_id);
+    token_admin_client.mint(&contributor, &500);
+    client.contribute(&contributor, &500, &token_id, &None);
+
+    env.ledger().set_timestamp(deadline + 1);
+    client.refund_single(&contributor);
+    assert_eq!(token_client.balance(&contributor), 500);
+
+    // Second refund must not pay out again.
+    let result = client.try_refund_single(&contributor);
+    assert_eq!(result.err(), Some(Ok(ContractError::NothingToRefund)));
+    assert_eq!(token_client.balance(&contributor), 500);
+}
+
+#[test]
+fn refund_batch_handles_partial_and_zero_contributors() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 10_000, 100);
+
+    let token_client = token::Client::new(&env, &token_id);
+
+    let c1 = Address::generate(&env);
+    let c2 = Address::generate(&env);
+    let stranger = Address::generate(&env);
+
+    token_admin_client.mint(&c1, &500);
+    token_admin_client.mint(&c2, &300);
+    client.contribute(&c1, &500, &token_id, &None);
+    client.contribute(&c2, &300, &token_id, &None);
+
+    // Refund c1 individually first, then batch over c1 (already refunded),
+    // c2 (still owed) and a stranger (never contributed).
+    env.ledger().set_timestamp(deadline + 1);
+    client.refund_single(&c1);
+    assert_eq!(token_client.balance(&c1), 500);
+
+    let mut batch = Vec::new(&env);
+    batch.push_back(c1.clone());
+    batch.push_back(c2.clone());
+    batch.push_back(stranger.clone());
+
+    let refunded = client.refund_batch(&batch);
+    assert_eq!(refunded, 1);
+
+    assert_eq!(token_client.balance(&c1), 500);
+    assert_eq!(token_client.balance(&c2), 300);
+    assert_eq!(token_client.balance(&stranger), 0);
+    assert_eq!(client.contribution(&c2), 0);
+}
+
+#[test]
+fn refund_batch_repeated_call_refunds_nothing() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 10_000, 100);
+
+    let c1 = Address::generate(&env);
+    token_admin_client.mint(&c1, &500);
+    client.contribute(&c1, &500, &token_id, &None);
+
+    env.ledger().set_timestamp(deadline + 1);
+
+    let mut batch = Vec::new(&env);
+    batch.push_back(c1.clone());
+    assert_eq!(client.refund_batch(&batch), 1);
+    assert_eq!(client.refund_batch(&batch), 0);
+}
+
+#[test]
+fn refund_partial_zero_amount_is_rejected() {
+    let env = setup_env();
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, 10_000, 100_000, 0);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &1_000);
+    client.contribute(&contributor, &1_000, &token_id, &None);
+
+    let result = client.try_refund_partial(&contributor, &0);
+    assert_eq!(result.err(), Some(Ok(ContractError::AmountNotPositive)));
+}
+
+#[test]
+fn refund_partial_without_contribution_is_rejected() {
+    let env = setup_env();
+    let (_creator, _token_id, client, _) = setup_contract(&env, 10_000, 100_000, 0);
+
+    let stranger = Address::generate(&env);
+    let result = client.try_refund_partial(&stranger, &100);
+    assert_eq!(result.err(), Some(Ok(ContractError::NothingToRefund)));
+}
+
+#[test]
+fn refund_partial_across_multiple_contributors() {
+    let env = setup_env();
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, 10_000, 100_000, 0);
+
+    let token_client = token::Client::new(&env, &token_id);
+
+    let c1 = Address::generate(&env);
+    let c2 = Address::generate(&env);
+    token_admin_client.mint(&c1, &1_000);
+    token_admin_client.mint(&c2, &600);
+    client.contribute(&c1, &1_000, &token_id, &None);
+    client.contribute(&c2, &600, &token_id, &None);
+    assert_eq!(client.total_raised(), 1_600);
+
+    // Each contributor may withdraw up to 50% of their own contribution.
+    client.refund_partial(&c1, &500);
+    client.refund_partial(&c2, &300);
+
+    assert_eq!(client.contribution(&c1), 500);
+    assert_eq!(client.contribution(&c2), 300);
+    assert_eq!(client.total_raised(), 800);
+    assert_eq!(token_client.balance(&c1), 500);
+    assert_eq!(token_client.balance(&c2), 300);
+}
+
+#[test]
+fn refund_partial_repeated_calls_respect_cumulative_limit() {
+    let env = setup_env();
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, 10_000, 100_000, 0);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &1_000);
+    client.contribute(&contributor, &1_000, &token_id, &None);
+
+    // Two 25% refunds are fine, a third would exceed the 50% cap.
+    client.refund_partial(&contributor, &250);
+    client.refund_partial(&contributor, &250);
+    assert_eq!(client.contribution(&contributor), 500);
+
+    let result = client.try_refund_partial(&contributor, &1);
+    assert_eq!(result.err(), Some(Ok(ContractError::RefundLimitExceeded)));
+}
+
+#[test]
+fn withdraw_after_deadline_below_goal_is_rejected() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 10_000, 100);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &500);
+    client.contribute(&contributor, &500, &token_id, &None);
+
+    env.ledger().set_timestamp(deadline + 1);
+    let result = client.try_withdraw();
+    assert_eq!(result.err(), Some(Ok(ContractError::GoalNotReached)));
+}
+
+#[test]
+fn withdraw_twice_after_deadline_is_rejected() {
+    let env = setup_env();
+    let deadline = 1_000u64;
+    let (_creator, token_id, client, token_admin_client) =
+        setup_contract(&env, deadline, 500, 100);
+
+    let contributor = Address::generate(&env);
+    token_admin_client.mint(&contributor, &500);
+    client.contribute(&contributor, &500, &token_id, &None);
+
+    env.ledger().set_timestamp(deadline + 1);
+    client.withdraw();
+
+    let result = client.try_withdraw();
+    assert_eq!(result.err(), Some(Ok(ContractError::NotActive)));
+}
+
 // ── Boundary tests (#107) ─────────────────────────────────────────────────────
 
 #[test]

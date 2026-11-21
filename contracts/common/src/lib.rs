@@ -1,4 +1,6 @@
 #![no_std]
+#![deny(warnings)]
+#![deny(clippy::pedantic)]
 
 mod access_control;
 mod error;
@@ -11,8 +13,7 @@ pub mod test_utils;
 
 pub use access_control::AccessControl;
 pub use error::{AchievementsError, CommonError};
-pub use events::{EventEmitter, topics};
-pub use events::EVENT_SCHEMA_VERSION;
+pub use events::{topics, EventEmitter, EVENT_SCHEMA_VERSION};
 pub use math::{
     apply_bps, apply_bps_saturating, proportional, ratio_bps, BASIS_POINTS_MAX, REWARD_DIVISOR,
 };

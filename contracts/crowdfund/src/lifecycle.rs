@@ -7,7 +7,7 @@ use soroban_sdk::{Address, Env, String, Vec};
 
 use crate::{
     errors::ContractError,
-    helpers::require_auth_creator,
+    helpers::{now, require_auth_creator},
     storage::{
         DataKey, KEY_ADMIN, KEY_ARCHIVED, KEY_CATEGORY, KEY_CREATOR, KEY_DEADLINE, KEY_DESC,
         KEY_GOAL, KEY_GOAL_HISTORY, KEY_MAX, KEY_META_HIST, KEY_MIN, KEY_PLATFORM, KEY_SOCIAL,
@@ -65,7 +65,7 @@ pub(crate) fn initialize(
         min_contribution,
         max_contribution,
         None,
-        env.ledger().timestamp(),
+        now(&env),
     )?;
     validate_string_length(&title, 64)?;
     validate_string_length(&description, 512)?;
@@ -94,7 +94,7 @@ pub(crate) fn initialize(
     storage.set(&KEY_VISIBILITY, &Visibility::Public);
     storage.set(&DataKey::ContributorCount, &0u32);
     storage.set(&DataKey::LargestContribution, &0i128);
-    storage.set(&KEY_START_TIME, &env.ledger().timestamp());
+    storage.set(&KEY_START_TIME, &now(&env));
 
     if let Some(links) = social_links {
         storage.set(&KEY_SOCIAL, &links);
@@ -117,7 +117,7 @@ pub(crate) fn initialize(
     history.push_back(GoalAdjustment {
         previous_goal: 0,
         new_goal: goal,
-        timestamp: env.ledger().timestamp(),
+        timestamp: now(&env),
     });
     env.storage().persistent().set(&KEY_GOAL_HISTORY, &history);
     env.storage().persistent().extend_ttl(
@@ -132,7 +132,7 @@ pub(crate) fn initialize(
         version: 0,
         title: title.clone(),
         description: description.clone(),
-        timestamp: env.ledger().timestamp(),
+        timestamp: now(&env),
     });
     env.storage().persistent().set(&KEY_META_HIST, &meta_hist);
     env.storage().persistent().extend_ttl(
@@ -212,7 +212,7 @@ pub(crate) fn initialize_from_template(
         min_contribution,
         max_contribution,
         None,
-        env.ledger().timestamp(),
+        now(&env),
     )?;
     validate_string_length(&title, 64)?;
     validate_string_length(&description, 512)?;
@@ -263,7 +263,7 @@ pub(crate) fn initialize_from_template(
     history.push_back(GoalAdjustment {
         previous_goal: 0,
         new_goal: goal,
-        timestamp: env.ledger().timestamp(),
+        timestamp: now(&env),
     });
     env.storage().persistent().set(&KEY_GOAL_HISTORY, &history);
     env.storage().persistent().extend_ttl(
@@ -313,7 +313,7 @@ pub(crate) fn clone_campaign(
         return Err(ContractError::InvalidGoal);
     }
     validate_goal_not_overflow(new_goal)?;
-    validate_deadline_extension(new_deadline, env.ledger().timestamp())?;
+    validate_deadline_extension(new_deadline, now(&env))?;
 
     // Copy metadata from current campaign
     let title: String = inst
@@ -348,7 +348,7 @@ pub(crate) fn clone_campaign(
     history.push_back(GoalAdjustment {
         previous_goal: 0,
         new_goal,
-        timestamp: env.ledger().timestamp(),
+        timestamp: now(&env),
     });
     env.storage().persistent().set(&KEY_GOAL_HISTORY, &history);
     env.storage().persistent().extend_ttl(
@@ -363,7 +363,7 @@ pub(crate) fn clone_campaign(
         version: 0,
         title: title.clone(),
         description: description.clone(),
-        timestamp: env.ledger().timestamp(),
+        timestamp: now(&env),
     });
     env.storage().persistent().set(&KEY_META_HIST, &meta_hist);
     env.storage().persistent().extend_ttl(
@@ -445,17 +445,17 @@ pub(crate) fn archive(env: Env) -> Result<(), ContractError> {
     }
 
     let total_raised: i128 = inst.get(&KEY_TOTAL).unwrap_or(0);
-    let now = env.ledger().timestamp();
+    let archived_at = now(&env);
 
     inst.set(&KEY_STATUS, &Status::Archived);
-    inst.set(&KEY_ARCHIVED, &now);
+    inst.set(&KEY_ARCHIVED, &archived_at);
 
     env.events().publish(
         ("crowdfund", "archived"),
         EventArchived {
             creator,
             total_raised,
-            timestamp: now,
+            timestamp: archived_at,
         },
     );
     Ok(())
@@ -529,7 +529,7 @@ pub(crate) fn adjust_goal(env: Env, new_goal: i128) -> Result<(), ContractError>
     let previous_goal: i128 = inst.get(&KEY_GOAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
     inst.set(&KEY_GOAL, &new_goal);
 
-    let now = env.ledger().timestamp();
+    let adjusted_at = now(&env);
     let mut history: Vec<GoalAdjustment> = env
         .storage()
         .persistent()
@@ -538,7 +538,7 @@ pub(crate) fn adjust_goal(env: Env, new_goal: i128) -> Result<(), ContractError>
     history.push_back(GoalAdjustment {
         previous_goal,
         new_goal,
-        timestamp: now,
+        timestamp: adjusted_at,
     });
     env.storage().persistent().set(&KEY_GOAL_HISTORY, &history);
     env.storage().persistent().extend_ttl(
@@ -554,7 +554,7 @@ pub(crate) fn adjust_goal(env: Env, new_goal: i128) -> Result<(), ContractError>
         EventGoalAdjusted {
             previous_goal,
             new_goal,
-            timestamp: now,
+            timestamp: adjusted_at,
         },
     );
     Ok(())

@@ -77,10 +77,26 @@
 //! `unlock_achievement`.
 
 #![no_std]
+#![deny(warnings)]
+#![deny(clippy::pedantic)]
 // The SDK deprecated `Events::publish` in favour of the `#[contractevent]` macro.
 // Migrating changes how events are encoded on the wire, so it is a behaviour change
 // for every off-chain consumer, not a lint cleanup, and is tracked separately.
 #![allow(deprecated)]
+// Pedantic lints that conflict with the Soroban contract ABI or the existing
+// public API surface; each is either unavoidable or out of scope for this cleanup.
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_lossless)]
+#![allow(clippy::unreadable_literal)]
+#![allow(clippy::similar_names)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::unused_self)]
+=======
 
 mod achievements;
 mod errors;
@@ -244,7 +260,7 @@ impl AchievementsContract {
         get_leaderboard(
             &env,
             validate_leaderboard_type(leaderboard_type)?,
-            limit as usize,
+            usize::try_from(limit).unwrap_or(usize::MAX),
         )
     }
 
@@ -483,16 +499,14 @@ impl AchievementsContract {
         let last_contribution: Option<u64> = env.storage().instance().get(&last_contribution_key);
         let current_streak: u32 = env.storage().instance().get(&streak_key).unwrap_or(0);
 
-        let new_streak = if let Some(last_time) = last_contribution {
-            let days_since = (current_time - last_time) / 86400;
+        let new_streak = last_contribution.map_or(1, |last_time| {
+            let days_since = current_time.saturating_sub(last_time) / 86_400;
             if days_since <= 1 {
-                current_streak + 1
+                current_streak.saturating_add(1)
             } else {
                 1
             }
-        } else {
-            1
-        };
+        });
 
         env.storage()
             .instance()
@@ -624,8 +638,8 @@ fn generate_nft_id(env: &Env, user: &Address, achievement_type: u32) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut hex_buf = [0u8; 64];
     for (i, byte) in raw.iter().enumerate() {
-        hex_buf[i * 2] = HEX[(byte >> 4) as usize];
-        hex_buf[i * 2 + 1] = HEX[(byte & 0x0f) as usize];
+        hex_buf[i * 2] = HEX[usize::from(byte >> 4)];
+        hex_buf[i * 2 + 1] = HEX[usize::from(byte & 0x0f)];
     }
 
     let hex_str = core::str::from_utf8(&hex_buf)
@@ -667,9 +681,12 @@ fn get_achievement_points(achievement_type: u32) -> u32 {
 /// Calculate contribution points
 fn calculate_contribution_points(amount: i128) -> u32 {
     // 1 point per 1,000,000 stroops (0.1 XLM), clamped to the documented range.
-    proportional(amount, REWARD_DIVISOR, 1)
-        .unwrap_or(0)
-        .clamp(1, 1000) as u32
+    u32::try_from(
+        proportional(amount, REWARD_DIVISOR, 1)
+            .unwrap_or(0)
+            .clamp(1, 1000),
+    )
+    .unwrap_or(1)
 }
 
 /// Store contribution record

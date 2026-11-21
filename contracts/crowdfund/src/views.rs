@@ -71,6 +71,8 @@ use crate::{
 
 use common::math::{apply_bps, apply_bps_saturating, proportional};
 
+use crate::helpers;
+
 // =============================================================================
 // Per-call instance-storage cache (issue #1148)
 // =============================================================================
@@ -454,7 +456,7 @@ pub(crate) fn get_vested_amount(env: Env) -> i128 {
     let vesting: Option<VestingSchedule> = inst.get(&KEY_VESTING);
     let Some(v) = vesting else { return payout };
 
-    let now = env.ledger().timestamp();
+    let now = helpers::now(&env);
     if now < v.cliff {
         return 0;
     }

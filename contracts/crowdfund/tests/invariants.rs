@@ -207,6 +207,154 @@ proptest! {
         assert_eq!(total, sum);
     }
 
+    /// Fuzz: raised == sum of contributions across random contribution
+    /// sequences, including repeat contributions from the same address.
+    #[test]
+    fn prop_raised_equals_sum_of_contributions(
+        ops in prop::collection::vec(
+            (0usize..8usize, 1i128..25_000i128),
+            1..20,
+        ),
+    ) {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let c = setup(&env, 1_000_000_000i128, 1_000_000u64, None);
+        env.ledger().set_timestamp(500);
+
+        // A small pool of contributors so repeat contributions occur.
+        let pool: std::vec::Vec<Address> = (0..8)
+            .map(|_| Address::generate(&env))
+            .collect();
+
+        let mut expected: std::vec::Vec<i128> = std::vec![0i128; pool.len()];
+        for (idx, amt) in &ops {
+            let addr = &pool[idx % pool.len()];
+            c.token_admin.mint(addr, amt);
+            if c.client.try_contribute(addr, amt, &c.token_id, &None).is_ok() {
+                expected[idx % pool.len()] += amt;
+            }
+        }
+
+        let raised = c.client.total_raised();
+        let mut sum: i128 = 0;
+        for (i, addr) in pool.iter().enumerate() {
+            let contribution = c.client.contribution(addr);
+            assert_eq!(
+                contribution, expected[i],
+                "per-contributor contribution must match accepted amounts"
+            );
+            sum += contribution;
+        }
+
+        assert_eq!(
+            raised, sum,
+            "raised ({}) must equal sum of contributions ({})",
+            raised, sum
+        );
+    }
+
+    /// Fuzz: raised == sum of contributions after a random mix of
+    /// contributions and refunds on a failed campaign.
+    #[test]
+    fn prop_raised_equals_sum_after_mixed_contribute_refund(
+        ops in prop::collection::vec(
+            (0usize..6usize, 1i128..10_000i128, any::<bool>()),
+            1..20,
+        ),
+    ) {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        // Goal far above reachable totals so the campaign always fails and
+        // refunds are permitted.
+        let c = setup(&env, 1_000_000_000i128, 1_000u64, None);
+        env.ledger().set_timestamp(500);
+
+        let pool: std::vec::Vec<Address> = (0..6)
+            .map(|_| Address::generate(&env))
+            .collect();
+
+        let mut expected: std::vec::Vec<i128> = std::vec![0i128; pool.len()];
+        for (idx, amt, refund) in &ops {
+            let addr = &pool[idx % pool.len()];
+            if *refund {
+                env.ledger().set_timestamp(1_001);
+                c.client.refund_single(addr);
+                expected[idx % pool.len()] = 0;
+            } else {
+                env.ledger().set_timestamp(500);
+                c.token_admin.mint(addr, amt);
+                if c.client.try_contribute(addr, amt, &c.token_id, &None).is_ok() {
+                    expected[idx % pool.len()] += amt;
+                }
+            }
+        }
+
+        let raised = c.client.total_raised();
+        let mut sum: i128 = 0;
+        for (i, addr) in pool.iter().enumerate() {
+            let contribution = c.client.contribution(addr);
+            assert_eq!(contribution, expected[i]);
+            sum += contribution;
+        }
+
+        assert_eq!(
+            raised, sum,
+            "raised ({}) must equal sum of contributions ({}) after mixed ops",
+            raised, sum
+        );
+    }
+
+    /// Fuzz: raised == sum of contributions is preserved through a
+    /// successful withdraw (raised is frozen, contributions unchanged).
+    #[test]
+    fn prop_raised_equals_sum_after_withdraw(
+        amounts in prop::collection::vec(1_000i128..10_000i128, 1..8),
+    ) {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let total: i128 = amounts.iter().sum();
+        let goal = total / 2 + 1;
+        let deadline = 1_000u64;
+
+        let c = setup(&env, goal, deadline, None);
+        env.ledger().set_timestamp(500);
+
+        let mut contributors: std::vec::Vec<Address> = std::vec::Vec::new();
+        for &amt in &amounts {
+            let addr = Address::generate(&env);
+            c.token_admin.mint(&addr, &amt);
+            if c.client.try_contribute(&addr, &amt, &c.token_id, &None).is_ok() {
+                contributors.push(addr);
+            }
+        }
+
+        let raised_before = c.client.total_raised();
+        let sum_before: i128 = contributors
+            .iter()
+            .map(|addr| c.client.contribution(addr))
+            .sum();
+        assert_eq!(raised_before, sum_before);
+
+        env.ledger().set_timestamp(deadline + 1);
+        let _ = c.client.try_withdraw();
+
+        let raised_after = c.client.total_raised();
+        let sum_after: i128 = contributors
+            .iter()
+            .map(|addr| c.client.contribution(addr))
+            .sum();
+
+        assert_eq!(
+            raised_after, sum_after,
+            "raised ({}) must equal sum of contributions ({}) after withdraw",
+            raised_after, sum_after
+        );
+        assert_eq!(raised_after, raised_before);
+    }
+
     #[test]
     fn test_invariant_no_funds_lost_before_deadline(
         amounts in prop::collection::vec(1i128..50_000i128, 1..15),

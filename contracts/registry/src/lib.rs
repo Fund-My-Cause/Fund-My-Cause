@@ -36,6 +36,7 @@
 //! - [`lookup`] — the three public, read-only, unauthenticated queries.
 
 #![no_std]
+#![deny(warnings)]
 // The SDK deprecated `Events::publish` in favour of the `#[contractevent]` macro.
 // Migrating changes how events are encoded on the wire, so it is a behaviour change
 // for every off-chain consumer, not a lint cleanup, and is tracked separately.
@@ -117,7 +118,7 @@ pub(crate) fn paginate(env: &Env, src: &Vec<Address>, offset: u32, limit: u32) -
         if let Some(addr) = src.get(i) {
             out.push_back(addr);
         }
-        i += 1;
+        i = i.saturating_add(1);
     }
     out
 }
@@ -150,7 +151,7 @@ impl RegistryContract {
     ///
     /// - [`ContractError::AlreadyInitialized`] if the contract has already been initialised.
     pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
-        admin::initialize(env, admin)
+        admin::initialize(&env, &admin)
     }
 
     // ── Registration entry-points ─────────────────────────────────────────────
@@ -168,7 +169,7 @@ impl RegistryContract {
     ///
     /// - [`ContractError::NotInitialized`] if `initialize` has not been called.
     pub fn register(env: Env, campaign_id: Address) -> Result<(), ContractError> {
-        admin::register(env, campaign_id)
+        admin::register(&env, &campaign_id)
     }
 
     /// Registers a campaign together with its numeric category id.
@@ -185,7 +186,7 @@ impl RegistryContract {
         campaign_id: Address,
         category_id: u32,
     ) -> Result<(), ContractError> {
-        admin::register_with_category(env, campaign_id, category_id)
+        admin::register_with_category(&env, &campaign_id, category_id)
     }
 
     /// Registers a campaign with a status tag for status-based filtering.
@@ -202,7 +203,7 @@ impl RegistryContract {
         campaign_id: Address,
         status: CampaignStatus,
     ) -> Result<(), ContractError> {
-        admin::register_with_status(env, campaign_id, status)
+        admin::register_with_status(&env, &campaign_id, status)
     }
 
     /// Updates the status tag for a registered campaign.
@@ -223,14 +224,14 @@ impl RegistryContract {
         old_status: CampaignStatus,
         new_status: CampaignStatus,
     ) -> Result<(), ContractError> {
-        admin::update_status(env, campaign_id, old_status, new_status)
+        admin::update_status(&env, &campaign_id, old_status, new_status)
     }
 
     // ── Read-only queries (no auth required) ──────────────────────────────────
 
     /// Returns a paginated slice of registered campaign contract addresses.
     pub fn list(env: Env, offset: u32, limit: u32) -> Vec<Address> {
-        lookup::list(env, offset, limit)
+        lookup::list(&env, offset, limit)
     }
 
     /// Returns a paginated slice of campaigns filtered by status.
@@ -240,7 +241,7 @@ impl RegistryContract {
         offset: u32,
         limit: u32,
     ) -> Vec<Address> {
-        lookup::list_by_status(env, status, offset, limit)
+        lookup::list_by_status(&env, status, offset, limit)
     }
 
     /// Returns a paginated slice of campaign addresses filtered by category.
@@ -250,7 +251,7 @@ impl RegistryContract {
         offset: u32,
         limit: u32,
     ) -> Vec<Address> {
-        lookup::get_campaigns_by_category(env, category_id, offset, limit)
+        lookup::get_campaigns_by_category(&env, category_id, offset, limit)
     }
 }
 
