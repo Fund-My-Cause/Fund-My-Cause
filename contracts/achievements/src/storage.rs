@@ -5,6 +5,9 @@ use soroban_sdk::{contracttype, symbol_short, Address, String, Symbol};
 pub const KEY_ADMIN: Symbol = symbol_short!("admin");
 /// Instance storage key for the platform address set during `initialize`.
 pub const KEY_PLATFORM: Symbol = symbol_short!("platform");
+/// Instance storage key for an optional authorized external caller (e.g. the
+/// crowdfund contract) that may call `record_contribution` on behalf of users.
+pub const KEY_AUTHORIZED_CALLER: Symbol = symbol_short!("authcall");
 
 /// Parameterized storage key variants.
 ///
