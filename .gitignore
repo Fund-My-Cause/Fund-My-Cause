@@ -9,6 +9,9 @@ target
 # Cargo.lock is intentionally tracked — see README
 task1.md
 
+# TypeScript incremental build info (#1761)
+*.tsbuildinfo
+
 # Contract coverage (Issue #1170)
 # The HTML report is large and reproducible — don't commit it.
 # coverage/summary.txt IS committed so reviewers can see trends in PRs.

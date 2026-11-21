@@ -1,4 +1,4 @@
-.PHONY: contracts-size contracts\:coverage help test-contract deploy-testnet dev-frontend test-frontend lint install-deps clean format fmt-check build size test docs docs-open docs-check
+.PHONY: contracts-size contracts\:coverage help test-contract deploy-testnet dev-frontend test-frontend lint install-deps clean format fmt-check build size test docs docs-open docs-check audit
 
 # Default target - show help
 help: ## Show this help
@@ -173,3 +173,34 @@ docs-check: ## Build rustdoc with warnings-as-errors (mirrors CI)
 	RUSTDOCFLAGS="--default-theme=ayu --cfg docsrs -D warnings" \
 		cargo doc --workspace --exclude benchmarks --no-deps --document-private-items
 	@echo "Documentation check passed."
+
+# ── Security Audit ────────────────────────────────────────────────────────────
+
+# Run npm audit and cargo audit, then triage findings.
+#
+# Exit behaviour:
+#   - npm audit: exits non-zero for HIGH or CRITICAL vulnerabilities (--audit-level=high)
+#   - cargo audit: exits non-zero for any unfixed advisory
+#   - The target exits non-zero if either tool reports findings that exceed the threshold.
+#
+# To suppress a known false-positive, add an ignore entry in .cargo/audit.toml
+# (Rust) or use `npm audit --omit=dev` / package resolutions (Node).
+audit: ## Run npm audit + cargo audit and triage findings
+	@echo "=== npm audit (threshold: high) ==="
+	npm audit --audit-level=high; NPM_EXIT=$$?; \
+	echo ""; \
+	echo "=== cargo audit ==="; \
+	if command -v cargo-audit > /dev/null 2>&1; then \
+		cargo audit; CARGO_EXIT=$$?; \
+	else \
+		echo "cargo-audit not installed — skipping Rust audit."; \
+		echo "Install with: cargo install cargo-audit"; \
+		CARGO_EXIT=0; \
+	fi; \
+	echo ""; \
+	if [ $$NPM_EXIT -ne 0 ] || [ $$CARGO_EXIT -ne 0 ]; then \
+		echo "ERROR: audit found vulnerabilities (npm exit=$$NPM_EXIT, cargo exit=$$CARGO_EXIT)."; \
+		echo "Triage findings above and either fix, pin a safe version, or add an advisory ignore."; \
+		exit 1; \
+	fi; \
+	echo "audit: no high/critical vulnerabilities found."
