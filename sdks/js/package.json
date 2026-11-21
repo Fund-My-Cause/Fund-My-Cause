@@ -19,6 +19,7 @@
   "scripts": {
     "build": "tsc",
     "test": "jest --passWithNoTests",
+    "test:coverage": "jest --coverage --coverageReporters=text --coverageReporters=lcov",
     "lint": "eslint src --ext .ts",
     "docs": "typedoc",
     "docs:check": "typedoc --emit none"
