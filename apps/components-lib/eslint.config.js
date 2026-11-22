@@ -37,6 +37,17 @@ export default [
       "no-undef": "off",
       "no-console": ["error", { allow: ["warn", "error"] }],
       "no-debugger": "error",
+      // Unused bindings are allowed only when prefixed with `_` (callback
+      // parameters that must stay for positional compatibility).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          caughtErrors: "none",
+        },
+      ],
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
     },

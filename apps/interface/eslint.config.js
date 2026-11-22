@@ -186,6 +186,9 @@ const eslintConfig = [
       "no-console": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": "off",
+      // Test files are named for the behaviour they cover
+      // (e.g. `CommandPalette.keyboard.test.tsx`), not for the component.
+      "local-rules/pascal-case-component-files": "off",
     },
   },
 ];
