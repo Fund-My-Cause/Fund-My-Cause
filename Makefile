@@ -6,6 +6,7 @@ help: ## Show this help
 	@echo ""
 	@echo "Available targets:"
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@printf "  \033[36m%-20s\033[0m %s\n" "contracts:coverage" "Measure crowdfund contract coverage and fail if below 90%"
 	@echo ""
 	@echo "Example workflow:"
 	@echo "  make install-deps       # One-time setup"
@@ -104,7 +105,7 @@ format: ## Format code (Rust + JavaScript)
 	cargo fmt --all
 	cargo fmt --manifest-path contracts/benchmarks/Cargo.toml
 	@echo "Formatting JavaScript/TypeScript code..."
-	cd apps/interface && npm run format 2>/dev/null || npx prettier --write "src/**/*.{ts,tsx,js,jsx}" || true
+	cd apps/interface && npm run format
 
 # Verify Rust formatting without modifying files
 fmt-check: ## Verify Rust formatting without modifying files
