@@ -35,6 +35,14 @@ export default [
           caughtErrors: "none",
         },
       ],
+      "@typescript-eslint/no-explicit-any": "error",
+    },
+  },
+  {
+    // Tests intentionally use `any` to inspect untyped HTTP payloads.
+    files: ["src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
 ];

@@ -322,7 +322,10 @@ export class PagerDutyIntegration {
         params: schedule_id ? { schedule_ids: [schedule_id] } : {},
       });
 
-      return response.data.oncalls.map((oncall: any) => ({
+      const data = response.data as {
+        oncalls?: Array<{ user: { id: string; summary: string } }>;
+      };
+      return (data.oncalls ?? []).map((oncall) => ({
         id: oncall.user.id,
         name: oncall.user.summary,
       }));
@@ -411,10 +414,15 @@ export class PagerDutyIntegration {
   /**
    * Get service details
    */
-  async getService(service_id: string): Promise<any> {
+  async getService(
+    service_id: string,
+  ): Promise<{ id: string; name: string } | null> {
     try {
       const response = await this.client.get(`/services/${service_id}`);
-      return response.data.service;
+      const data = response.data as {
+        service?: { id: string; name: string };
+      };
+      return data.service ?? null;
     } catch (error) {
       logger.error({ err: error }, "Failed to get service");
       return null;
@@ -427,7 +435,10 @@ export class PagerDutyIntegration {
   async listServices(): Promise<Array<{ id: string; name: string }>> {
     try {
       const response = await this.client.get("/services");
-      return response.data.services.map((service: any) => ({
+      const data = response.data as {
+        services?: Array<{ id: string; name: string }>;
+      };
+      return (data.services ?? []).map((service) => ({
         id: service.id,
         name: service.name,
       }));

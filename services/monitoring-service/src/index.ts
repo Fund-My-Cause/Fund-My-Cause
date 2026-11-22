@@ -342,7 +342,7 @@ app.post("/alerts", async (req: Request, res: Response) => {
           requestId: req.headers["x-request-id"],
           failedDeliveries: failedDeliveries.map((r) => ({
             ruleId: r.ruleId,
-            error: r.error instanceof Error ? r.error.message : r.error,
+            error: String(r.error),
           })),
         },
         "Some notification deliveries failed",
