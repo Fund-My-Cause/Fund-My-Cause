@@ -9,10 +9,10 @@ crowdfund    = { path = "../crowdfund" }
 achievements = { path = "../achievements" }
 qf           = { path = "../qf" }
 registry     = { path = "../registry" }
-soroban-sdk  = { version = "25.3.0", features = ["testutils"] }
+soroban-sdk  = { workspace = true, features = ["testutils"] }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = { workspace = true }
 
 [[bench]]
 name = "contract_benchmarks"

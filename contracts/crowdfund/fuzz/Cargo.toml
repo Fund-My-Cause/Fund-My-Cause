@@ -13,8 +13,8 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.4"
-arbitrary = { version = "1", features = ["derive"] }
+libfuzzer-sys = { workspace = true }
+arbitrary = { workspace = true, features = ["derive"] }
 
 [dependencies.crowdfund]
 path = ".."

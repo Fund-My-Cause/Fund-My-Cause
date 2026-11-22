@@ -11,10 +11,40 @@ exclude = ["contracts/benchmarks"]
 output-dir = "target/doc"
 
 [workspace.dependencies]
+# Shared dependency versions. Per-contract manifests should reference these with
+# `workspace = true` (e.g. `soroban-sdk = { workspace = true }`) so versions stay
+# unified across the workspace (see #1724, run `cargo udeps` to find unused deps).
 soroban-sdk = "25.3.0"
 
+# Test / dev tooling shared across contracts.
+proptest = "1.5.0"
+criterion = "0.5.1"
+
+# Fuzzing tooling (used by fuzz targets under contracts/*/fuzz).
+libfuzzer-sys = "0.4.7"
+arbitrary = "1.3.2"
+
+# ---------------------------------------------------------------------------
+# WASM size optimization (see #1722)
+# ---------------------------------------------------------------------------
+# The release profile below is tuned for minimal WASM binary size. To profile
+# and verify the size budget:
+#
+#   1. Build the optimized WASM:
+#        cargo build --release --target wasm32-unknown-unknown -p <contract>
+#   2. Install twiggy (one-time):
+#        cargo install twiggy
+#   3. Inspect the largest contributors to the binary:
+#        twiggy top -n 20 target/wasm32-unknown-unknown/release/<contract>.wasm
+#        twiggy dominators -n 20 target/wasm32-unknown-unknown/release/<contract>.wasm
+#   4. Optionally diff against a baseline to catch regressions:
+#        twiggy diff baseline.wasm new.wasm
+#
+# Size budget: each contract WASM should stay under 100 KiB after optimization.
+# If a change pushes a contract over budget, use the twiggy output above to
+# identify and remove the offending code/dependencies before merging.
+# ---------------------------------------------------------------------------
 [profile.release]
-# Optimized for minimal WASM binary size:
 # opt-level="z" minimizes code size; lto eliminates dead code; codegen-units=1
 # enables full optimization; panic="abort" avoids unwind info; strip="symbols"
 # removes debug symbols; overflow-checks=false reduces runtime overhead
@@ -29,5 +59,7 @@ codegen-units = 1
 lto = true
 
 [profile.release-with-logs]
+# Inherits the size-tuned release profile but keeps debug assertions enabled
+# for verbose logging during testing/debugging.
 inherits = "release"
 debug-assertions = true
