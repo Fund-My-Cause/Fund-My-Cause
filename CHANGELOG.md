@@ -21,6 +21,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   components.
 
 ### Added
+- **#1717 Common validation helpers** — `validate_goal`, `validate_deadline`, and
+  `validate_amount_range` added to `contracts/common/src/validation.rs` and exported from the
+  crate root. Contracts can now delegate primitive input checks to these shared implementations
+  instead of maintaining independent copies.
+- **#1716 Crowdfund upgrade/migration harness** — `KEY_CONTRACT_VERSION` is now written during
+  `initialize` so every fresh deployment has a stored version. `seed_old_schema` added to
+  `contracts/crowdfund/tests/common.rs` as a shared fixture for migration tests that need to
+  simulate a v5 on-disk layout.
+- **#1715 Achievements authorized-caller access control** — `add_authorized_caller` (admin-only)
+  lets the platform register an external contract (e.g. `crowdfund`) that may call
+  `record_contribution` without requiring the individual user's signature. `get_authorized_caller`
+  returns the currently registered address. Tests added to `tests/access_control.rs`.
+- **#1714 QF rounding/precision property tests** — rounding-specific tests added to
+  `contracts/qf/src/tests/property_and_edge_cases.rs` verifying the accounting identity
+  (`total_distributed + remaining_pool == matching_pool`), that `remaining_pool` is never
+  negative, and that floor division cannot cause `total_distributed > matching_pool`.
 - **#1531 90 % line-coverage floor on crowdfund contract** — `make contracts:coverage` runs
   `cargo llvm-cov` for the `crowdfund` package and fails with a non-zero exit code when line
   coverage drops below 90 %. New branch tests in

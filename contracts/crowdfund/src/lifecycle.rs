@@ -9,10 +9,11 @@ use crate::{
     errors::ContractError,
     helpers::require_auth_creator,
     storage::{
-        DataKey, KEY_ADMIN, KEY_ARCHIVED, KEY_CATEGORY, KEY_CREATOR, KEY_DEADLINE, KEY_DESC,
-        KEY_GOAL, KEY_GOAL_HISTORY, KEY_MAX, KEY_META_HIST, KEY_MIN, KEY_PLATFORM, KEY_SOCIAL,
-        KEY_START_TIME, KEY_STATUS, KEY_TITLE, KEY_TOKEN, KEY_TOTAL, KEY_VESTING, KEY_VISIBILITY,
-        TTL_INSTANCE_EXTEND_MAX, TTL_INSTANCE_EXTEND_MIN, TTL_PERSISTENT_ENTRY,
+        CONTRACT_VERSION, DataKey, KEY_ADMIN, KEY_ARCHIVED, KEY_CATEGORY, KEY_CONTRACT_VERSION,
+        KEY_CREATOR, KEY_DEADLINE, KEY_DESC, KEY_GOAL, KEY_GOAL_HISTORY, KEY_MAX, KEY_META_HIST,
+        KEY_MIN, KEY_PLATFORM, KEY_SOCIAL, KEY_START_TIME, KEY_STATUS, KEY_TITLE, KEY_TOKEN,
+        KEY_TOTAL, KEY_VESTING, KEY_VISIBILITY, TTL_INSTANCE_EXTEND_MAX, TTL_INSTANCE_EXTEND_MIN,
+        TTL_PERSISTENT_ENTRY,
     },
     types::{
         CampaignTemplate, Category, EventArchived, EventCampaignCloned, EventCancelled,
@@ -95,6 +96,7 @@ pub(crate) fn initialize(
     storage.set(&DataKey::ContributorCount, &0u32);
     storage.set(&DataKey::LargestContribution, &0i128);
     storage.set(&KEY_START_TIME, &env.ledger().timestamp());
+    storage.set(&KEY_CONTRACT_VERSION, &CONTRACT_VERSION);
 
     if let Some(links) = social_links {
         storage.set(&KEY_SOCIAL, &links);

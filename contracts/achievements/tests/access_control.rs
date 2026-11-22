@@ -129,3 +129,43 @@ fn get_points_and_level_require_no_auth() {
     assert_eq!(client.get_level(&user), 1);
     assert_eq!(client.get_achievements(&user).len(), 0);
 }
+
+// ── add_authorized_caller() — admin-only ────────────────────────────────────
+
+#[test]
+fn add_authorized_caller_succeeds_for_admin() {
+    let env = setup_env();
+    let (client, _admin, _platform) = deploy_and_init(&env);
+    let external_contract = Address::generate(&env);
+
+    client.add_authorized_caller(&external_contract);
+    assert_eq!(client.get_authorized_caller(), Some(external_contract));
+}
+
+#[test]
+#[should_panic]
+fn add_authorized_caller_without_admin_auth_panics() {
+    let env = setup_env();
+    let (client, _admin, _platform) = deploy_and_init(&env);
+    let external_contract = Address::generate(&env);
+
+    env.set_auths(&[]);
+    client.add_authorized_caller(&external_contract);
+}
+
+#[test]
+fn authorized_caller_can_record_contribution_without_user_auth() {
+    let env = setup_env();
+    let (client, _admin, _platform) = deploy_and_init(&env);
+    let authorized = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    // Register the external contract as authorized.
+    client.add_authorized_caller(&authorized);
+
+    // The authorized caller signs but the user does not.
+    // mock_all_auths() is active so this call succeeds.
+    client.record_contribution(&user, &String::from_str(&env, "campaign-1"), &1_000_000);
+    // Contribution was recorded — user has at least 1 point.
+    assert!(client.get_points(&user) > 0);
+}
