@@ -34,8 +34,9 @@
 //! ```
 
 #![no_std]
+#![deny(warnings)]
 use common::math::proportional;
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Vec, Map, String};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Map};
 
 // ================================================================
 // Quadratic Funding Core Logic
@@ -141,9 +142,7 @@ impl QuadraticFunding {
     /// For each recipient with total contribution C and contributor count N:
     ///   matching = pool * (N^0.5) / sum(N^0.5)
     ///   total = C + matching
-    pub fn calculate(
-        input: QFInput,
-    ) -> Result<QFResult, QFError> {
+    pub fn calculate(input: QFInput) -> Result<QFResult, QFError> {
         // Validate input
         if input.matching_pool <= 0 {
             return Err(QFError::InvalidPoolAmount);
@@ -180,9 +179,6 @@ impl QuadraticFunding {
         let mut total_distributed: i128 = 0;
         let mut recipients_funded: u64 = 0;
 
-        // Sort recipients by contribution amount for deterministic results
-        let mut recipients: Vec<Address> = Vec::new(&input.contributions.env());
-
         // Collect valid recipients that meet threshold
         for (recipient, contrib) in input.contributions.iter() {
             let contributor_count = input.contributor_counts.get(recipient.clone()).unwrap_or(0);
@@ -208,9 +204,7 @@ impl QuadraticFunding {
                 .map_err(|_| QFError::Overflow)?;
 
             // Total = original contribution + matching
-            let total = contrib
-                .checked_add(matching)
-                .ok_or(QFError::Overflow)?;
+            let total = contrib.checked_add(matching).ok_or(QFError::Overflow)?;
 
             // Invariant: No negative payouts
             if total < 0 {
@@ -255,11 +249,12 @@ impl QuadraticFunding {
         if n == 0 {
             return 0;
         }
-        let mut x = n as i128;
+        let n_i128 = i128::from(n);
+        let mut x = n_i128;
         let mut y = (x + 1) / 2;
         while y < x {
             x = y;
-            y = (x + n as i128 / x) / 2;
+            y = (x + n_i128 / x) / 2;
         }
         x
     }
@@ -268,7 +263,7 @@ impl QuadraticFunding {
     fn total_unique_contributors(contributions: &Map<Address, i128>) -> u64 {
         // In a real implementation, this would count unique contributors
         // For now, return the number of recipients that received contributions
-        contributions.len() as u64
+        u64::from(contributions.len())
     }
 }
 
@@ -282,6 +277,10 @@ pub struct QFContract;
 #[contractimpl]
 impl QFContract {
     /// Calculate quadratic funding allocations
+    ///
+    /// # Errors
+    /// Returns a [`QFError`] if the input is invalid or the computation
+    /// overflows.
     pub fn calculate_qf(
         env: Env,
         matching_pool: i128,
@@ -326,12 +325,27 @@ mod common_error_mapping_tests {
     /// Every shared `CommonError` variant folds into a stable QF variant (#1705).
     #[test]
     fn common_errors_map_to_expected_variants() {
-        assert_eq!(QFError::from(CommonError::Unauthorized), QFError::InvalidPoolAmount);
+        assert_eq!(
+            QFError::from(CommonError::Unauthorized),
+            QFError::InvalidPoolAmount
+        );
         assert_eq!(QFError::from(CommonError::NotFound), QFError::NoContributions);
-        assert_eq!(QFError::from(CommonError::InvalidInput), QFError::NegativeContribution);
-        assert_eq!(QFError::from(CommonError::AlreadyInitialized), QFError::InvalidPoolAmount);
-        assert_eq!(QFError::from(CommonError::AlreadyExists), QFError::RecipientBelowThreshold);
-        assert_eq!(QFError::from(CommonError::NotInitialized), QFError::NoContributions);
+        assert_eq!(
+            QFError::from(CommonError::InvalidInput),
+            QFError::NegativeContribution
+        );
+        assert_eq!(
+            QFError::from(CommonError::AlreadyInitialized),
+            QFError::InvalidPoolAmount
+        );
+        assert_eq!(
+            QFError::from(CommonError::AlreadyExists),
+            QFError::RecipientBelowThreshold
+        );
+        assert_eq!(
+            QFError::from(CommonError::NotInitialized),
+            QFError::NoContributions
+        );
         assert_eq!(QFError::from(CommonError::Paused), QFError::InvalidPoolAmount);
         assert_eq!(QFError::from(CommonError::Overflow), QFError::Overflow);
     }

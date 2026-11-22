@@ -62,11 +62,20 @@
 //! in [`types`] for the full list of event payloads.
 
 #![no_std]
+#![deny(warnings)]
 #![allow(clippy::too_many_arguments)]
 // The SDK deprecated `Events::publish` in favour of the `#[contractevent]` macro.
 // Migrating changes how events are encoded on the wire, so it is a behaviour change
 // for every off-chain consumer, not a lint cleanup, and is tracked separately.
 #![allow(deprecated)]
+// Pedantic lints that are noisy for Soroban contracts (large `#[contractimpl]`
+// blocks, generated client code, and doc-heavy public API) are opted out here
+// rather than at each call site.
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::must_use_candidate)]
+=======
 
 use common::math::{proportional, REWARD_DIVISOR};
 
@@ -875,9 +884,13 @@ impl CrowdfundContract {
             }
         }
 
-        let total: i128 = inst.get(&KEY_TOTAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let total: i128 = inst
+            .get(&KEY_TOTAL)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         if total > 0 {
-            let token_address: Address = inst.get(&KEY_TOKEN).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+            let token_address: Address = inst
+                .get(&KEY_TOKEN)
+                .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
             token::Client::new(&env, &token_address).transfer(
                 &env.current_contract_address(),
                 &admin,
@@ -1141,14 +1154,18 @@ impl CrowdfundContract {
         }
 
         // Require campaign to be Active before accepting sponsor escrow
-        let status: Status = inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let status: Status = inst
+            .get(&KEY_STATUS)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         if status != Status::Active {
             return Err(ContractError::NotActive);
         }
 
         // ── Escrow matching funds from sponsor into the contract ──────────────
         common::AccessControl::require_role_auth(&sponsor);
-        let token_address: Address = inst.get(&KEY_TOKEN).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let token_address: Address = inst
+            .get(&KEY_TOKEN)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         token::Client::new(&env, &token_address).transfer(
             &sponsor,
             env.current_contract_address(),
@@ -3795,7 +3812,9 @@ impl CrowdfundContract {
         let inst = env.storage().instance();
         let creator = require_auth_creator(&env)?;
 
-        let status: Status = inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let status: Status = inst
+            .get(&KEY_STATUS)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         if status != Status::Active {
             return Err(ContractError::NotActive);
         }
@@ -4017,17 +4036,23 @@ impl CrowdfundContract {
     /// Must be called while the campaign is `Active`.
     pub fn set_caps(env: Env, soft_cap: i128, stretch_goal: i128) -> Result<(), ContractError> {
         let inst = env.storage().instance();
-        let status: Status = inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let status: Status = inst
+            .get(&KEY_STATUS)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         if status != Status::Active {
             return Err(ContractError::NotActive);
         }
-        let creator: Address = inst.get(&KEY_CREATOR).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let creator: Address = inst
+            .get(&KEY_CREATOR)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         common::AccessControl::require_role_auth(&creator);
 
         if soft_cap < 0 || stretch_goal < 0 {
             return Err(ContractError::InvalidGoal);
         }
-        let goal: i128 = inst.get(&KEY_GOAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let goal: i128 = inst
+            .get(&KEY_GOAL)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         // soft_cap must not exceed the hard goal; stretch_goal must be >= goal
         if soft_cap > 0 && soft_cap > goal {
             return Err(ContractError::InvalidGoal);
@@ -4137,8 +4162,7 @@ mod panic_safety_tests {
         );
 
         // A huge amount must surface as a contract error, never a host panic.
-        let result =
-            client.try_contribute(&addr, &i128::MAX, &token_id, &None);
+        let result = client.try_contribute(&addr, &i128::MAX, &token_id, &None);
         assert!(result.is_err());
     }
 
@@ -4197,12 +4221,8 @@ mod panic_safety_tests {
         assert!(client.try_set_caps(&0, &0).is_err());
         assert!(client.try_update_category(&Category::Other).is_err());
         assert!(client.try_propose_extension(&1_000_000).is_err());
-        assert!(client
-            .try_setup_matching(&addr, &10_000, &1_000)
-            .is_err());
-        assert!(client
-            .try_configure_yield(&addr, &1_000, &500)
-            .is_err());
+        assert!(client.try_setup_matching(&addr, &10_000, &1_000).is_err());
+        assert!(client.try_configure_yield(&addr, &1_000, &500).is_err());
     }
 
     #[test]

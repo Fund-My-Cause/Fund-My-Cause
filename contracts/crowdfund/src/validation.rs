@@ -99,12 +99,17 @@ pub(crate) fn validate_contributor_cap(
 
 /// Validates campaign deadline has passed.
 ///
+/// The deadline is inclusive: at `current_time == deadline` the campaign is
+/// considered ended. Callers must pass the ledger timestamp obtained from the
+/// shared time helper (`crate::time`); this module never reads the ledger
+/// directly so the boundary rule lives in exactly one place.
+///
 /// # Arguments
-/// * `current_time` - Current ledger timestamp
+/// * `current_time` - Current ledger timestamp (from the shared time helper)
 /// * `deadline` - Campaign deadline timestamp
 ///
 /// # Returns
-/// * `Ok(())` if deadline has passed
+/// * `Ok(())` if deadline has passed (including exactly at the deadline)
 /// * `Err(ContractError::CampaignStillActive)` if deadline hasn't passed
 pub(crate) fn validate_deadline_passed(
     current_time: u64,
@@ -118,13 +123,19 @@ pub(crate) fn validate_deadline_passed(
 
 /// Validates campaign deadline hasn't passed.
 ///
+/// The deadline is inclusive: at `current_time == deadline` the campaign is
+/// considered ended. Callers must pass the ledger timestamp obtained from the
+/// shared time helper (`crate::time`); this module never reads the ledger
+/// directly so the boundary rule lives in exactly one place.
+///
 /// # Arguments
-/// * `current_time` - Current ledger timestamp
+/// * `current_time` - Current ledger timestamp (from the shared time helper)
 /// * `deadline` - Campaign deadline timestamp
 ///
 /// # Returns
 /// * `Ok(())` if deadline hasn't passed
-/// * `Err(ContractError::CampaignEnded)` if deadline has passed
+/// * `Err(ContractError::CampaignEnded)` if deadline has passed (including
+///   exactly at the deadline)
 pub(crate) fn validate_deadline_not_passed(
     current_time: u64,
     deadline: u64,
@@ -220,17 +231,23 @@ pub(crate) fn validate_delegation(amount: i128) -> Result<(), ContractError> {
 
 /// Validates partial refund amount.
 ///
+/// A refund of exactly half the contribution is allowed; anything above it is
+/// rejected. A zero refund is rejected as `AmountNotPositive` so callers can
+/// distinguish "nothing to refund" from "over the limit".
+///
 /// # Arguments
 /// * `refund_amount` - Amount to refund
 /// * `total_contribution` - Total contribution by the address
 ///
 /// # Returns
 /// * `Ok(())` if refund is valid
+/// * `Err(ContractError::AmountNotPositive)` if `refund_amount <= 0`
 /// * `Err(ContractError::RefundLimitExceeded)` if refund exceeds limit
 pub(crate) fn validate_partial_refund(
     refund_amount: i128,
     total_contribution: i128,
 ) -> Result<(), ContractError> {
+    validate_positive_amount(refund_amount)?;
     if refund_amount > total_contribution / 2 {
         return Err(ContractError::RefundLimitExceeded);
     }
@@ -321,8 +338,13 @@ pub(crate) fn validate_fee_bps(fee_bps: u32) -> Result<(), ContractError> {
 /// Combining the deadline and goal checks into one function allows both
 /// `refund_single` and `refund_batch` to share the same short-circuit logic.
 ///
+/// The deadline boundary is inclusive and delegated to
+/// [`validate_deadline_passed`] so refund eligibility and every other
+/// deadline check agree on the exact same rule. `now` must come from the
+/// shared time helper (`crate::time`).
+///
 /// # Arguments
-/// * `now` - Current ledger timestamp
+/// * `now` - Current ledger timestamp (from the shared time helper)
 /// * `deadline` - Campaign deadline timestamp
 /// * `total` - Total amount raised
 /// * `goal` - Campaign funding goal
@@ -337,9 +359,7 @@ pub(crate) fn validate_refund_eligibility(
     total: i128,
     goal: i128,
 ) -> Result<(), ContractError> {
-    if now < deadline {
-        return Err(ContractError::CampaignStillActive);
-    }
+    validate_deadline_passed(now, deadline)?;
     if total >= goal {
         return Err(ContractError::GoalReached);
     }
@@ -397,8 +417,6 @@ pub(crate) fn validate_category(category: &Category) -> Result<(), ContractError
 /// # Arguments
 /// * `required_approvals` - Minimum approvals needed to execute a proposal
 /// * `num_governors` - Number of governor addresses configured
-/// * `timelock_delay` - Timelock delay in seconds (currently unrestricted, but
-///   validated for presence to keep the signature stable)
 ///
 /// # Returns
 /// * `Ok(())` if the configuration is internally consistent
@@ -406,9 +424,7 @@ pub(crate) fn validate_category(category: &Category) -> Result<(), ContractError
 pub(crate) fn validate_governance_config(
     required_approvals: u32,
     num_governors: u32,
-    timelock_delay: u64,
 ) -> Result<(), ContractError> {
-    let _ = timelock_delay; // no upper/lower bound enforced yet
     if num_governors == 0 || required_approvals == 0 || required_approvals > num_governors {
         return Err(ContractError::InvalidInput);
     }

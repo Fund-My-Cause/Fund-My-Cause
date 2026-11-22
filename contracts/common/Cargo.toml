@@ -13,5 +13,16 @@ soroban-sdk = { workspace = true }
 [dev-dependencies]
 proptest = { workspace = true }
 
+[lints.rust]
+warnings = "deny"
+
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+# Allow pedantic lints that are noisy or not actionable in contract code.
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
 [lib]
 crate-type = ["cdylib", "rlib"]

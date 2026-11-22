@@ -7,6 +7,9 @@
 /// Maximum basis points (10,000 = 100%).
 pub const BASIS_POINTS_MAX: i128 = 10_000;
 
+/// Maximum basis points as `u32`, for ratio results.
+const BASIS_POINTS_MAX_U32: u32 = 10_000;
+
 /// Divisor used to convert stroops into whole units for reward and points
 /// calculations.
 pub const REWARD_DIVISOR: i128 = 1_000_000;
@@ -14,20 +17,21 @@ pub const REWARD_DIVISOR: i128 = 1_000_000;
 /// Apply a basis-point fee/ratio to an amount using checked arithmetic.
 ///
 /// Returns `amount * bps / 10_000`, truncated toward zero.
-/// Returns `Err(CommonError::InvalidInput)` on overflow or if bps > 10_000.
+/// Returns `Err(CommonError::InvalidInput)` on overflow or if `bps > 10_000`.
 ///
 /// # Examples
 /// ```
-/// # use common::math::{apply_bps, BASIS_POINTS_MAX};
+/// # use common::math::apply_bps;
 /// assert_eq!(apply_bps(10_000, 250).unwrap(), 250);
 /// assert_eq!(apply_bps(1_000_000, 10_000).unwrap(), 1_000_000);
 /// ```
 pub fn apply_bps(amount: i128, bps: u32) -> Result<i128, crate::CommonError> {
-    if bps as i128 > BASIS_POINTS_MAX {
+    let bps = i128::from(bps);
+    if bps > BASIS_POINTS_MAX {
         return Err(crate::CommonError::InvalidInput);
     }
     amount
-        .checked_mul(bps as i128)
+        .checked_mul(bps)
         .and_then(|v| v.checked_div(BASIS_POINTS_MAX))
         .ok_or(crate::CommonError::InvalidInput)
 }
@@ -38,7 +42,7 @@ pub fn apply_bps(amount: i128, bps: u32) -> Result<i128, crate::CommonError> {
 /// Saturates at `i128::MAX` on overflow instead of returning an error.
 /// Use this in read-only views where degraded precision is preferred over failure.
 pub fn apply_bps_saturating(amount: i128, bps: u32) -> i128 {
-    (amount.saturating_mul(bps as i128)) / BASIS_POINTS_MAX
+    amount.saturating_mul(i128::from(bps)) / BASIS_POINTS_MAX
 }
 
 /// Proportional calculation: `numerator * total / denominator`.
@@ -73,10 +77,10 @@ pub fn ratio_bps(numerator: i128, denominator: i128) -> u32 {
         return 0;
     }
     if numerator >= denominator {
-        return BASIS_POINTS_MAX as u32;
+        return BASIS_POINTS_MAX_U32;
     }
     let raw = numerator.saturating_mul(BASIS_POINTS_MAX) / denominator;
-    raw.min(BASIS_POINTS_MAX) as u32
+    u32::try_from(raw.min(BASIS_POINTS_MAX)).unwrap_or(BASIS_POINTS_MAX_U32)
 }
 
 #[cfg(test)]
@@ -204,7 +208,7 @@ mod tests {
     #[test]
     fn test_ratio_bps_caps_at_100_percent() {
         assert_eq!(ratio_bps(20_000, 10_000), 10_000);
-        assert_eq!(ratio_bps(i128::MAX, 1), BASIS_POINTS_MAX as u32);
+        assert_eq!(ratio_bps(i128::MAX, 1), 10_000);
     }
 
     #[test]
@@ -222,14 +226,16 @@ mod tests {
             denominator in any::<i128>(),
         ) {
             let bps = ratio_bps(numerator, denominator);
-            prop_assert!(bps <= BASIS_POINTS_MAX as u32);
+            prop_assert!(bps <= 10_000);
 
             if numerator <= 0 || denominator <= 0 {
                 prop_assert_eq!(bps, 0);
             } else if numerator >= denominator {
-                prop_assert_eq!(bps, BASIS_POINTS_MAX as u32);
+                prop_assert_eq!(bps, 10_000);
             } else if let Some(scaled) = numerator.checked_mul(BASIS_POINTS_MAX) {
-                prop_assert_eq!(bps, (scaled / denominator).min(BASIS_POINTS_MAX) as u32);
+                let expected = u32::try_from((scaled / denominator).min(BASIS_POINTS_MAX))
+                    .unwrap_or(10_000);
+                prop_assert_eq!(bps, expected);
             }
         }
     }

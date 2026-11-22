@@ -1,4 +1,6 @@
 #![no_std]
+#![deny(warnings)]
+#![deny(clippy::pedantic)]
 
 mod access_control;
 mod error;

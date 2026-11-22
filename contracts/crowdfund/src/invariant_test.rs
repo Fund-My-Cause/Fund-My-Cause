@@ -31,6 +31,7 @@
 use super::*;
 use crate::types::Category;
 use crate::{CrowdfundContract, CrowdfundContractClient};
+use proptest::prelude::*;
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     Address, Env, String, Vec,
@@ -81,11 +82,7 @@ fn setup_contract(
 ///
 /// In a real implementation, this would iterate over stored contributions
 /// via indexed keys. For testing, we track contributors and sum their balances.
-fn sum_contributions(
-    env: &Env,
-    client: &CrowdfundContractClient,
-    contributors: &Vec<Address>,
-) -> i128 {
+fn sum_contributions(client: &CrowdfundContractClient, contributors: &Vec<Address>) -> i128 {
     let mut total = 0i128;
     for contrib in contributors.iter() {
         let balance = client.contribution(contrib);
@@ -96,13 +93,12 @@ fn sum_contributions(
 
 /// Core invariant check: stored total == sum of contributions.
 fn check_invariant(
-    env: &Env,
     client: &CrowdfundContractClient,
     contributors: &Vec<Address>,
     operation_label: &str,
 ) {
     let stored_total = client.total_raised();
-    let computed_total = sum_contributions(env, client, contributors);
+    let computed_total = sum_contributions(client, contributors);
 
     assert_eq!(
         stored_total, computed_total,
@@ -126,7 +122,7 @@ fn invariant_single_contribution() {
     contributors.push_back(contrib1.clone());
 
     client.contribute(&contrib1, &1_000, &token_id, &None);
-    check_invariant(&env, &client, &contributors, "after_single_contribute");
+    check_invariant(&client, &contributors, "after_single_contribute");
 }
 
 #[test]
@@ -143,12 +139,7 @@ fn invariant_multiple_sequential_contributions() {
         contributors.push_back(contrib.clone());
 
         client.contribute(&contrib, &1_000i128 + (i as i128 * 100), &token_id, &None);
-        check_invariant(
-            &env,
-            &client,
-            &contributors,
-            &format!("after_contribute_{}", i),
-        );
+        check_invariant(&client, &contributors, &format!("after_contribute_{}", i));
     }
 }
 
@@ -165,15 +156,15 @@ fn invariant_repeat_contributor() {
 
     // First contribution
     client.contribute(&contrib, &1_000, &token_id, &None);
-    check_invariant(&env, &client, &contributors, "after_first_contribute");
+    check_invariant(&client, &contributors, "after_first_contribute");
 
     // Second contribution from same address
     client.contribute(&contrib, &2_000, &token_id, &None);
-    check_invariant(&env, &client, &contributors, "after_repeat_contribute");
+    check_invariant(&client, &contributors, "after_repeat_contribute");
 
     // Third contribution
     client.contribute(&contrib, &3_000, &token_id, &None);
-    check_invariant(&env, &client, &contributors, "after_third_contribute");
+    check_invariant(&client, &contributors, "after_third_contribute");
 }
 
 #[test]
@@ -192,17 +183,17 @@ fn invariant_contributions_then_cancellation() {
 
         client.contribute(&contrib, &10_000, &token_id, &None);
     }
-    check_invariant(&env, &client, &contributors, "after_5_contributions");
+    check_invariant(&client, &contributors, "after_5_contributions");
 
     // Cancel campaign
     env.ledger().set_timestamp(11_000u64);
     client.cancel_campaign();
-    check_invariant(&env, &client, &contributors, "after_cancel");
+    check_invariant(&client, &contributors, "after_cancel");
 
     // Refund one contributor
     let first_contrib = contributors.get(0);
     client.refund_single(&first_contrib);
-    check_invariant(&env, &client, &contributors, "after_single_refund");
+    check_invariant(&client, &contributors, "after_single_refund");
 }
 
 #[test]
@@ -221,16 +212,16 @@ fn invariant_batch_refund() {
 
         client.contribute(&contrib, &5_000, &token_id, &None);
     }
-    check_invariant(&env, &client, &contributors, "after_25_contributions");
+    check_invariant(&client, &contributors, "after_25_contributions");
 
     // Cancel and batch refund
     env.ledger().set_timestamp(11_000u64);
     client.cancel_campaign();
-    check_invariant(&env, &client, &contributors, "after_cancel");
+    check_invariant(&client, &contributors, "after_cancel");
 
     let contributor_addresses: Vec<Address> = contributors.clone();
     client.refund_batch(&contributor_addresses);
-    check_invariant(&env, &client, &contributors, "after_batch_refund");
+    check_invariant(&client, &contributors, "after_batch_refund");
 }
 
 // ── Randomized/Fuzz-Like Tests ────────────────────────────────────────────────
@@ -297,7 +288,6 @@ fn invariant_randomized_contributions_100_iterations() {
         // Check invariant every 10 iterations to avoid too much overhead
         if iteration % 10 == 0 {
             check_invariant(
-                &env,
                 &client,
                 &contributors,
                 &format!("randomized_iteration_{}", iteration),
@@ -306,7 +296,7 @@ fn invariant_randomized_contributions_100_iterations() {
     }
 
     // Final invariant check
-    check_invariant(&env, &client, &contributors, "end_of_randomized_test");
+    check_invariant(&client, &contributors, "end_of_randomized_test");
 }
 
 #[test]
@@ -323,7 +313,7 @@ fn invariant_edge_case_zero_contributions() {
 
     // Contribute minimum amount
     client.contribute(&contrib, &1, &token_id, &None);
-    check_invariant(&env, &client, &contributors, "after_min_contribution");
+    check_invariant(&client, &contributors, "after_min_contribution");
 }
 
 #[test]
@@ -340,7 +330,7 @@ fn invariant_large_contribution() {
 
     let large_amount = i128::MAX / 8;
     client.contribute(&contrib, &large_amount, &token_id, &None);
-    check_invariant(&env, &client, &contributors, "after_large_contribution");
+    check_invariant(&client, &contributors, "after_large_contribution");
 }
 
 #[test]
@@ -349,9 +339,131 @@ fn invariant_empty_campaign() {
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 1_000_000, 100);
 
     let contributors: Vec<Address> = Vec::new(&env);
-    check_invariant(&env, &client, &contributors, "empty_campaign");
+    check_invariant(&client, &contributors, "empty_campaign");
 
     assert_eq!(client.total_raised(), 0);
+}
+
+// ── Property-Based (proptest) Tests ──────────────────────────────────────────
+//
+// These tests generate random operation sequences (contributions, refunds,
+// cancellations) and assert the core invariant `raised == Σ(contributions)`
+// after every state-mutating operation. Deterministic seed-based cases above
+// remain as fast regression coverage; proptest explores a much wider input
+// space and shrinks any failing sequence to a minimal reproduction.
+
+/// A single operation in a generated sequence.
+#[derive(Clone, Debug)]
+enum Op {
+    /// A contribution from contributor index `who` of `amount`.
+    Contribute { who: usize, amount: i128 },
+    /// A single refund for contributor index `who`.
+    RefundSingle { who: usize },
+    /// A batch refund over all known contributors.
+    RefundBatch,
+    /// Cancel the campaign (only valid after the deadline).
+    Cancel,
+}
+
+fn op_strategy() -> impl Strategy<Value = Op> {
+    prop_oneof![
+        // Bias toward contributions so sequences build up meaningful totals.
+        6 => (0usize..8, 100i128..20_000i128)
+            .prop_map(|(who, amount)| Op::Contribute { who, amount }),
+        2 => (0usize..8).prop_map(|who| Op::RefundSingle { who }),
+        1 => Just(Op::RefundBatch),
+        1 => Just(Op::Cancel),
+    ]
+}
+
+fn sequence_strategy() -> impl Strategy<Value = Vec<Op>> {
+    prop::collection::vec(op_strategy(), 1..40)
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig {
+        cases: 64,
+        max_shrink_iters: 2_000,
+        ..ProptestConfig::default()
+    })]
+
+    /// Invariant: `raised == Σ(contributions)` holds after every operation in a
+    /// randomly generated sequence of contributions, refunds and cancellations.
+    #[test]
+    fn prop_invariant_raised_equals_sum_of_contributions(ops in sequence_strategy()) {
+        let env = Env::default();
+        let (_creator, token_id, client, token_admin_client) =
+            setup_contract(&env, 10_000, 1_000_000_000, 100);
+
+        // Pre-create a fixed pool of contributors so generated indices are stable.
+        let mut contributors: Vec<Address> = Vec::new(&env);
+        for _ in 0..8 {
+            let contrib = Address::generate(&env);
+            token_admin_client.mint(&contrib, &1_000_000_000);
+            contributors.push_back(contrib);
+        }
+
+        let mut cancelled = false;
+
+        for (step, op) in ops.iter().enumerate() {
+            match op {
+                Op::Contribute { who, amount } => {
+                    if cancelled {
+                        continue;
+                    }
+                    let contributor = contributors.get(*who as u32);
+                    // Contributions may legitimately fail (e.g. goal reached);
+                    // the invariant must hold regardless of success.
+                    let _ = client.try_contribute(&contributor, amount, &token_id, &None);
+                }
+                Op::RefundSingle { who } => {
+                    if !cancelled {
+                        continue;
+                    }
+                    let contributor = contributors.get(*who as u32);
+                    let _ = client.try_refund_single(&contributor);
+                }
+                Op::RefundBatch => {
+                    if !cancelled {
+                        continue;
+                    }
+                    let _ = client.try_refund_batch(&contributors);
+                }
+                Op::Cancel => {
+                    if cancelled {
+                        continue;
+                    }
+                    env.ledger().set_timestamp(11_000u64);
+                    let _ = client.try_cancel_campaign();
+                    cancelled = true;
+                }
+            }
+
+            check_invariant(&client, &contributors, &format!("proptest_step_{}", step));
+        }
+
+        // Final invariant check after the whole sequence.
+        check_invariant(&client, &contributors, "proptest_end");
+    }
+
+    /// Invariant holds for arbitrary single contribution amounts above the
+    /// configured minimum, including very large values.
+    #[test]
+    fn prop_invariant_single_contribution_amount(amount in 100i128..1_000_000_000i128) {
+        let env = Env::default();
+        let (_creator, token_id, client, token_admin_client) =
+            setup_contract(&env, 1_000, i128::MAX / 2, 100);
+
+        let contrib = Address::generate(&env);
+        token_admin_client.mint(&contrib, &amount);
+
+        let mut contributors: Vec<Address> = Vec::new(&env);
+        contributors.push_back(contrib.clone());
+
+        client.contribute(&contrib, &amount, &token_id, &None);
+        check_invariant(&client, &contributors, "proptest_single_contribution");
+        prop_assert_eq!(client.total_raised(), amount);
+    }
 }
 
 // ── Panic Regression Tests ───────────────────────────────────────────────────

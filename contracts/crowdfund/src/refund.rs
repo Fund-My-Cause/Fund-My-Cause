@@ -9,6 +9,7 @@ use soroban_sdk::{token, Address, Env, Vec};
 
 use crate::{
     errors::ContractError,
+    helpers,
     storage::{
         DataKey, KEY_CREATOR, KEY_DEADLINE, KEY_GOAL, KEY_RELEASED, KEY_STATUS, KEY_TOKEN,
         KEY_TOTAL, MAX_BATCH_REFUND_SIZE, TTL_INSTANCE_EXTEND_MAX, TTL_INSTANCE_EXTEND_MIN,
@@ -55,7 +56,7 @@ pub(crate) fn refund_single(env: Env, contributor: Address) -> Result<(), Contra
 
     if status != Status::Cancelled {
         validate_refund_eligibility(
-            env.ledger().timestamp(),
+            helpers::now(&env),
             inst.get(&KEY_DEADLINE).unwrap_or(0),
             inst.get(&KEY_TOTAL).unwrap_or(0),
             inst.get(&KEY_GOAL).unwrap_or(0),
@@ -135,7 +136,7 @@ pub(crate) fn refund_batch(env: Env, contributors: Vec<Address>) -> Result<u32, 
 
     if status != Status::Cancelled {
         validate_refund_eligibility(
-            env.ledger().timestamp(),
+            helpers::now(&env),
             inst.get(&KEY_DEADLINE).unwrap_or(0),
             inst.get(&KEY_TOTAL).unwrap_or(0),
             inst.get(&KEY_GOAL).unwrap_or(0),
@@ -202,6 +203,12 @@ pub(crate) fn refund_partial(
 
     validate_partial_refund(amount, total_contrib)?;
 
+    // A zero (or negative) refund is a no-op: skip the token transfer and
+    // avoid emitting a misleading event or mutating accounting state.
+    if amount <= 0 {
+        return Ok(());
+    }
+
     let inst = env.storage().instance();
     let token: Address = inst.get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;
     token::Client::new(&env, &token).transfer(
@@ -213,8 +220,10 @@ pub(crate) fn refund_partial(
     let remaining = total_contrib - amount;
     env.storage().persistent().set(&contrib_key, &remaining);
 
+    // Clamp at zero so a partial refund can never drive the campaign total
+    // negative (which would corrupt later eligibility checks).
     let total: i128 = inst.get(&KEY_TOTAL).unwrap_or(0);
-    inst.set(&KEY_TOTAL, &(total - amount));
+    inst.set(&KEY_TOTAL, &total.saturating_sub(amount).max(0));
 
     env.events().publish(
         ("crowdfund", "partial_refund"),
