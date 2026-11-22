@@ -15,6 +15,11 @@ task1.md
 coverage/html/
 coverage/lcov.info
 
+# Per-workspace coverage reports and TypeScript build info (generated)
+**/coverage/lcov-report/
+**/coverage/lcov.info
+**/*.tsbuildinfo
+
 # Test fixtures (generated)
 fixtures/seed-data.json
 fixtures/test-fixtures.json
