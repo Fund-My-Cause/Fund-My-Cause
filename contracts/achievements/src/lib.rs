@@ -119,6 +119,7 @@ pub use validation::*;
 use common::math::{proportional, REWARD_DIVISOR};
 use common::{AccessControl, CommonError, EventEmitter, EVENT_SCHEMA_VERSION};
 use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, String, Vec};
+use crate::storage::KEY_AUTHORIZED_CALLER;
 
 /// Main achievement contract
 #[contract]
@@ -371,6 +372,39 @@ impl AchievementsContract {
         Ok(total_points)
     }
 
+    /// Registers an external contract address as an authorized caller for
+    /// `record_contribution` and `record_referral`. Admin-only.
+    ///
+    /// Once set, the authorized caller may invoke those entry points without
+    /// requiring the individual user's signature on the achievements
+    /// transaction.  This is intended for the crowdfund contract (or any
+    /// platform contract) so it can trigger achievement tracking as part of
+    /// its own contribution flow.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::Unauthorized`] if the caller is not the admin.
+    pub fn add_authorized_caller(
+        env: Env,
+        caller: Address,
+    ) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&storage::KEY_ADMIN)
+            .ok_or(ContractError::Unauthorized)?;
+        AccessControl::require_role_auth(&admin);
+        env.storage()
+            .instance()
+            .set(&KEY_AUTHORIZED_CALLER, &caller);
+        Ok(())
+    }
+
+    /// Returns the currently registered authorized caller, if any.
+    pub fn get_authorized_caller(env: Env) -> Option<Address> {
+        env.storage().instance().get(&KEY_AUTHORIZED_CALLER)
+    }
+
     /// Records a user contribution and evaluates contribution-based achievements.
     ///
     /// Stores the contribution, awards points based on amount, updates level,
@@ -397,7 +431,25 @@ impl AchievementsContract {
         campaign_id: String,
         amount: i128,
     ) -> Result<(), ContractError> {
-        user.require_auth();
+        // Allow either the user themselves or an authorized external caller
+        // (e.g. the crowdfund contract stored as KEY_AUTHORIZED_CALLER by the
+        // admin) to record a contribution.  This lets the platform trigger
+        // achievement tracking on behalf of users during a cross-contract
+        // contribute flow, without requiring each user to additionally sign
+        // the achievements transaction.
+        let authorized_caller: Option<Address> = env
+            .storage()
+            .instance()
+            .get(&KEY_AUTHORIZED_CALLER);
+        if let Some(ref caller) = authorized_caller {
+            if caller != &user {
+                caller.require_auth();
+            } else {
+                user.require_auth();
+            }
+        } else {
+            user.require_auth();
+        }
 
         validate_amount(amount)?;
 

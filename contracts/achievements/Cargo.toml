@@ -19,16 +19,4 @@ common = { path = "../common" }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 common = { path = "../common", features = ["testutils"] }
-proptest = "1.4"
-
-[lints.rust]
-warnings = "deny"
-
-[lints.clippy]
-all = "deny"
-pedantic = "warn"
-# Soroban contract entrypoints and generated code commonly trigger these.
-missing_errors_doc = "allow"
-missing_panics_doc = "allow"
-module_name_repetitions = "allow"
-must_use_candidate = "allow"
+proptest = { workspace = true }

@@ -11,7 +11,7 @@ testutils = ["soroban-sdk/testutils"]
 soroban-sdk = { workspace = true }
 
 [dev-dependencies]
-proptest = "1.4"
+proptest = { workspace = true }
 
 [lints.rust]
 warnings = "deny"
