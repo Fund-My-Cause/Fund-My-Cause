@@ -1,15 +1,10 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
-import { normalizeDateInput } from "@/lib/date";
 
 function toFiniteNumber(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function toDateParam(value: string | null): string {
-  return normalizeDateInput(value) ?? "";
 }
 
 export type FilterTab = "all" | "active" | "funded" | "ended";
@@ -66,16 +61,22 @@ export function useCampaignFilters(): UseCampaignFiltersReturn {
     searchParams.get("goalMax") ?? "",
   );
   const [dateFrom, setDateFrom] = React.useState(
-    toDateParam(searchParams.get("dateFrom")),
+    searchParams.get("dateFrom") ?? "",
   );
-  const [dateTo, setDateTo] = React.useState(
-    toDateParam(searchParams.get("dateTo")),
-  );
+  const [dateTo, setDateTo] = React.useState(searchParams.get("dateTo") ?? "");
 
   const setParam = React.useCallback(
     (key: string, value: string) => {
-      const params = buildSearchParams(searchParams.toString());
-      applyDefaultParamRemoval(params, key, value);
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === "") {
+        params.delete(key);
+      } else if (key === "filter" && value === "all") {
+        params.delete(key);
+      } else if (key === "sort" && value === "recent") {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
       if (key !== "page") params.delete("page");
       router.replace(`/campaigns?${params.toString()}`, { scroll: false });
     },
@@ -88,11 +89,9 @@ export function useCampaignFilters(): UseCampaignFiltersReturn {
     else params.delete("goalMin");
     if (goalMax) params.set("goalMax", goalMax);
     else params.delete("goalMax");
-    const normalizedFrom = normalizeDateInput(dateFrom);
-    if (normalizedFrom) params.set("dateFrom", normalizedFrom);
+    if (dateFrom) params.set("dateFrom", dateFrom);
     else params.delete("dateFrom");
-    const normalizedTo = normalizeDateInput(dateTo);
-    if (normalizedTo) params.set("dateTo", normalizedTo);
+    if (dateTo) params.set("dateTo", dateTo);
     else params.delete("dateTo");
     params.delete("page");
     router.replace(`/campaigns?${params.toString()}`, { scroll: false });
@@ -104,7 +103,7 @@ export function useCampaignFilters(): UseCampaignFiltersReturn {
     setGoalMax("");
     setDateFrom("");
     setDateTo("");
-    const params = buildSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams.toString());
     ["goalMin", "goalMax", "dateFrom", "dateTo"].forEach((k) =>
       params.delete(k),
     );
@@ -121,78 +120,46 @@ export function useCampaignFilters(): UseCampaignFiltersReturn {
     return () => clearTimeout(timer);
   }, [inputValue, setParam]);
 
-  const activeGoalMin = React.useMemo(
-    () => toFiniteNumber(searchParams.get("goalMin")),
-    [searchParams],
-  );
-  const activeGoalMax = React.useMemo(
-    () => toFiniteNumber(searchParams.get("goalMax")),
-    [searchParams],
-  );
-  const activeDateFrom = React.useMemo(
-    () => searchParams.get("dateFrom") ?? null,
-    [searchParams],
-  );
-  const activeDateTo = React.useMemo(
-    () => searchParams.get("dateTo") ?? null,
-    [searchParams],
-  );
-  const hasAdvanced = React.useMemo(
-    () =>
-      !!(
-        activeGoalMin ||
-        activeGoalMax ||
-        activeDateFrom ||
-        activeDateTo
-      ),
-    [activeGoalMin, activeGoalMax, activeDateFrom, activeDateTo],
+  const activeGoalMin = toFiniteNumber(searchParams.get("goalMin"));
+  const activeGoalMax = toFiniteNumber(searchParams.get("goalMax"));
+  const activeDateFrom = searchParams.get("dateFrom") ?? null;
+  const activeDateTo = searchParams.get("dateTo") ?? null;
+  const hasAdvanced = !!(
+    activeGoalMin ||
+    activeGoalMax ||
+    activeDateFrom ||
+    activeDateTo
   );
 
-  const filters: CampaignFilters = React.useMemo(
-    () => ({
-      filter,
-      sort,
-      query,
-      category,
-      page,
-      goalMin,
-      goalMax,
-      dateFrom,
-      dateTo,
-    }),
-    [filter, sort, query, category, page, goalMin, goalMax, dateFrom, dateTo],
-  );
+  const filters: CampaignFilters = {
+    filter,
+    sort,
+    query,
+    category,
+    page,
+    goalMin,
+    goalMax,
+    dateFrom,
+    dateTo,
+  };
 
-  return React.useMemo(
-    () => ({
-      filters,
-      setParam,
-      setInputValue,
-      setGoalMin,
-      setGoalMax,
-      setDateFrom,
-      setDateTo,
-      applyAdvanced,
-      clearAdvanced,
-      inputValue,
-      showAdvanced,
-      setShowAdvanced,
-      hasAdvanced,
-      activeGoalMin,
-      activeGoalMax,
-      activeDateFrom,
-      activeDateTo,
-    }),
-    [
-      filters,
-      setParam,
-      inputValue,
-      showAdvanced,
-      hasAdvanced,
-      activeGoalMin,
-      activeGoalMax,
-      activeDateFrom,
-      activeDateTo,
-    ],
-  );
+  return {
+    filters,
+    setParam,
+    setInputValue,
+    setGoalMin,
+    setGoalMax,
+    setDateFrom,
+    setDateTo,
+    applyAdvanced,
+    clearAdvanced,
+    inputValue,
+    showAdvanced,
+    setShowAdvanced,
+    hasAdvanced,
+    activeGoalMin,
+    activeGoalMax,
+    activeDateFrom,
+    activeDateTo,
+  };
 }

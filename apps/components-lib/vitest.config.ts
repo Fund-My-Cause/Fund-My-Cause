@@ -14,6 +14,9 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   resolve: {
+    // Per-component entry files import extensionless paths (e.g. `./Select`)
+    // that resolve to .tsx sources.
+    extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
     alias: {
       "@design-tokens": fileURLToPath(
         new URL("../interface/src/styles/design-tokens.ts", import.meta.url),

@@ -1,12 +1,15 @@
 import "dotenv/config";
 import express, { Express } from "express";
+import type { Logger as PinoLogger } from "pino";
 import {
   buildPage,
   createLogger,
   resolvePaginationArgs,
   CursorDecodeError,
+  loadDbPoolConfig,
 } from "@fund-my-cause/shared-utils";
 import { SorobanRPCClient } from "./rpc-client.js";
+import { loadStoreConfig } from "./store-config.js";
 import { HealthChecker } from "./health-checker.js";
 import { EventStore } from "./event-store.js";
 import { createEventDispatcher } from "./handlers/index.js";
@@ -41,6 +44,9 @@ const storeConfig = loadStoreConfig();
 const dbPoolConfig = loadDbPoolConfig();
 
 const logger = createLogger("indexer:main");
+// The shared logger wraps pino; the store/dispatcher/health modules type
+// against pino's Logger interface directly.
+const pinoLogger = logger as unknown as PinoLogger;
 
 // Express app
 const app: Express = express();
@@ -48,30 +54,38 @@ const app: Express = express();
 // Global state
 const rpcClient = new SorobanRPCClient(
   { url: RPC_URL, contractId: CONTRACT_ID, contractIds: CONTRACT_IDS },
-  logger,
+  pinoLogger,
 );
-const healthChecker = new HealthChecker(logger);
+const healthChecker = new HealthChecker(pinoLogger);
 
 // Build the repository once at startup.  All handlers interact with
 // `eventRepository` (the interface) rather than `eventStore` directly,
 // so the storage layer can be replaced without touching handler code.
-const eventStore = new EventStore(logger, 10000, storeConfig.maxEventCapacity);
+import { EventStoreRepository } from "./repository-impl";
+import type { EventRepository } from "./repository";
+import { runMigrations } from "./migrations/run-migrations";
+
+const eventStore = new EventStore(
+  pinoLogger,
+  10000,
+  storeConfig.maxEventCapacity,
+);
 const eventRepository: EventRepository = new EventStoreRepository(
   eventStore,
-  logger,
+  pinoLogger,
 );
 
 // Apply store migrations (#894, #1127) before ingestion starts so
 // queryByContract/queryByType/queryByContractAndType use the O(k) secondary
 // indexes from the first event onward instead of falling back to a linear
 // scan for the lifetime of the process.
-runMigrations(eventStore, "up", logger);
+runMigrations(eventStore, "up", pinoLogger);
 
 // Build the dispatcher once at startup from the canonical event-type registry
 // (#896, modularized by contract type in #1125, per-event registry in #1517).
 // Unknown event types fall back to `eventRepository` directly so no event is
 // ever lost.
-const dispatcher = createEventDispatcher(logger, eventRepository);
+const dispatcher = createEventDispatcher(pinoLogger, eventRepository);
 
 let isRunning = false;
 
@@ -203,7 +217,7 @@ app.get("/events", (req, res) => {
     });
   } catch (err) {
     if (err instanceof CursorDecodeError) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ error: (err as Error).message });
       return;
     }
     throw err;

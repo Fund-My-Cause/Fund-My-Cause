@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo } from "react";
+import { useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { useXlmBalance } from "@/hooks/useXlmBalance";
 import { useWalletSlice } from "@/hooks/useWalletSlice";
@@ -42,34 +42,18 @@ export function useWallet(): UseWalletReturn {
     [signTxAction, addToast],
   );
 
-  return useMemo(
-    () => ({
-      address,
-      xlmBalance,
-      refreshBalance,
-      connect,
-      disconnect,
-      signTx,
-      isConnecting,
-      isAutoConnecting,
-      isSigning,
-      error,
-      networkMismatch,
-      walletNetwork,
-    }),
-    [
-      address,
-      xlmBalance,
-      refreshBalance,
-      connect,
-      disconnect,
-      signTx,
-      isConnecting,
-      isAutoConnecting,
-      isSigning,
-      error,
-      networkMismatch,
-      walletNetwork,
-    ],
-  );
+  return {
+    address,
+    xlmBalance,
+    refreshBalance,
+    connect,
+    disconnect,
+    signTx,
+    isConnecting,
+    isAutoConnecting,
+    isSigning,
+    error,
+    networkMismatch,
+    walletNetwork,
+  };
 }

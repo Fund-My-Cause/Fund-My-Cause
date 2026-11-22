@@ -81,7 +81,7 @@
     "storybook:build": "storybook build"
   },
   "dependencies": {
-    "@fund-my-cause/shared-utils": "workspace:*",
+    "@fund-my-cause/shared-utils": "*",
     "lucide-react": "0.577.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"

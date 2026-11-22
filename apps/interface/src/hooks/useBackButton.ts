@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { appendHistoryEntry } from "@repo/shared-utils";
 
 export interface UseBackButtonOptions {
   /** Route to navigate to when no history is available */
@@ -41,8 +40,10 @@ export function useBackButton({
 
   // Track pathname changes
   useEffect(() => {
-    const next = appendHistoryEntry(historyRef.current, pathname, maxHistory);
-    if (next === historyRef.current) return;
+    const prev = historyRef.current;
+    // Avoid duplicate consecutive entries
+    if (prev[prev.length - 1] === pathname) return;
+    const next = [...prev, pathname].slice(-maxHistory);
     historyRef.current = next;
     setHistory(next);
   }, [pathname, maxHistory]);

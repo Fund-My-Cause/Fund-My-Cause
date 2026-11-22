@@ -91,7 +91,7 @@ export interface CampaignsViewProps {
   onClearComparison: () => void;
 
   // i18n strings
-  t: (key: string, opts?: Record<string, unknown>) => string;
+  t: (key: string, opts?: Record<string, string | number | Date>) => string;
 }
 
 // ── CSS helpers ───────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useToast } from "@/components/ui/Toast";
-import { useWallet } from "@/hooks/useWallet";
+import { useWalletSlice } from "@/hooks/useWalletSlice";
 import type { WalletType } from "@/services/wallet.service";
 
 // Mounted once near the app root but only ever shown after the user opts
@@ -21,23 +21,19 @@ const WalletSelectModal = dynamic(
  * Renders the wallet picker whenever useWallet()'s connect() is called.
  * Lives outside the WalletContext's old Provider tree since Zustand stores
  * don't need one — mount this once near the app root.
- *
- * WalletSelectModal renders through the shared components-lib Modal, so this
- * host stays a thin wrapper with no interface-local modal markup.
  */
 export function WalletSelectModalHost() {
-  const { showWalletSelect, setShowWalletSelect, connectWith } = useWallet();
+  const {
+    showWalletSelect,
+    setShowWalletSelect,
+    connectWith: connectWithAction,
+  } = useWalletSlice();
   const { addToast } = useToast();
 
   const handleSelect = useCallback(
     (walletType: WalletType) =>
-      connectWith(walletType, (msg, type) => addToast(msg, type)),
-    [connectWith, addToast],
-  );
-
-  const handleClose = useCallback(
-    () => setShowWalletSelect(false),
-    [setShowWalletSelect],
+      connectWithAction(walletType, (msg, type) => addToast(msg, type)),
+    [connectWithAction, addToast],
   );
 
   if (!showWalletSelect) return null;

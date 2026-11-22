@@ -1,16 +1,14 @@
 // Custom hooks library
-// Shared hooks now live in the shared package and are re-exported here to
-// keep the public hook surface stable for existing imports.
-export { useLocalStorage } from "@shared/hooks";
-export { useDebounce } from "@shared/hooks";
-export { useAsync } from "@shared/hooks";
-export type { AsyncStatus, AsyncState, UseAsyncReturn } from "@shared/hooks";
-export { useInfiniteList } from "@shared/hooks";
+export { useLocalStorage } from "./useLocalStorage";
+export { useDebounce } from "./useDebounce";
+export { useAsync } from "./useAsync";
+export type { AsyncStatus, AsyncState, UseAsyncReturn } from "./useAsync";
+export { useInfiniteList } from "./useInfiniteList";
 export type {
   UseInfiniteListOptions,
   UseInfiniteListReturn,
   InfiniteListPage,
-} from "@shared/hooks";
+} from "./useInfiniteList";
 
 // Wallet hook — single source of wallet state for all components
 export { useWallet } from "./useWallet";
@@ -34,18 +32,18 @@ export {
   useRecommendedCampaigns,
 } from "./useRecommendations";
 export { useComments } from "./useComments";
-export { useBreakpoint } from "@shared/hooks";
-export { useFocusTrap } from "@shared/hooks";
+export { useBreakpoint } from "./useBreakpoint";
+export { useFocusTrap } from "./useFocusTrap";
 export { useSearchSuggestions } from "./useSearchSuggestions";
 export type { SearchSuggestion } from "./useSearchSuggestions";
-export { useBackButton } from "@shared/hooks";
+export { useBackButton } from "./useBackButton";
 export type {
   UseBackButtonOptions,
   UseBackButtonReturn,
-} from "@shared/hooks";
+} from "./useBackButton";
 
 // PWA hooks
-export { useInstallPrompt } from "@shared/hooks";
+export { useInstallPrompt } from "./useInstallPrompt";
 
 // Store slice hooks (scoped selectors — prefer these over direct store imports)
 export {

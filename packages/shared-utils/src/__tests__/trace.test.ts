@@ -89,8 +89,9 @@ describe("generateTraceId", () => {
     expect(id).toMatch(/^fmc-[0-9a-f]{8}-[0-9a-f]{16}$/);
   });
 
-  it("has total length of 28 characters", () => {
-    expect(generateTraceId()).toHaveLength(28);
+  it("has total length of 29 characters", () => {
+    // "fmc-" (4) + timestamp (8) + "-" (1) + random (16)
+    expect(generateTraceId()).toHaveLength(29);
   });
 
   it("generates unique IDs on successive calls", () => {

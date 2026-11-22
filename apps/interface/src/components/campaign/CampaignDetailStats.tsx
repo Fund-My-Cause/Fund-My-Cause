@@ -28,7 +28,11 @@ export function CampaignDetailStats({
         <p className="mt-1 text-xs text-gray-500">Avg. contribution</p>
       </div>
       <div className="rounded-xl bg-gray-100 p-4 dark:bg-gray-900">
-        <CountdownTimer deadline={deadline} />
+        <CountdownTimer
+          deadline={
+            typeof deadline === "string" ? deadline : deadline.toISOString()
+          }
+        />
         <p className="mt-1 text-xs text-gray-500">Remaining</p>
       </div>
     </div>

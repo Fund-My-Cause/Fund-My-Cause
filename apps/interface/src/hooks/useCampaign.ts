@@ -1,10 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { fetchCampaignView } from "@/lib/graphql/client";
 import type { CampaignInfo, CampaignStats } from "@fund-my-cause/types";
 import { isValidContractId } from "@/lib/validation";
 import { QUERY_KEYS } from "@/lib/queryKeys";
-import { QUERY_DEFAULTS } from "@/lib/queryClient";
 
 export interface CampaignInitialData {
   info: CampaignInfo;
@@ -39,8 +38,7 @@ export function useCampaign(
     queryKey: QUERY_KEYS.campaign(contractId),
     queryFn: () => fetchCampaignView(contractId),
     enabled: isValidContractId(contractId),
-    // Inherit shared caching/retry config from the QueryClient defaults.
-    ...QUERY_DEFAULTS.campaign,
+    retry: false,
     // SSR-preloaded data seeds the cache so the first render is instant and
     // the component never enters the loading skeleton state on page load.
     initialData: initialData ?? undefined,
@@ -49,14 +47,11 @@ export function useCampaign(
     initialDataUpdatedAt: initialData ? Date.now() : undefined,
   });
 
-  const error = useMemo(
-    () =>
-      rawError?.message ??
-      (isValidContractId(contractId)
-        ? null
-        : `Invalid contract ID format: ${contractId}`),
-    [rawError, contractId],
-  );
+  const error =
+    rawError?.message ??
+    (isValidContractId(contractId)
+      ? null
+      : `Invalid contract ID format: ${contractId}`);
 
   const refresh = useCallback(() => {
     setOptimisticDelta(null);
@@ -77,25 +72,18 @@ export function useCampaign(
   }, []);
 
   const baseStats = data?.stats ?? null;
-
-  // Memoize the derived stats object so consumers (e.g. campaign list rows)
-  // don't re-render when unrelated state changes. Only recompute when the
-  // base stats or the optimistic delta actually change.
-  const stats: CampaignStats | null = useMemo(() => {
-    if (!baseStats) return null;
-    if (!optimisticDelta) return baseStats;
-    return {
-      ...baseStats,
-      totalRaised: baseStats.totalRaised + optimisticDelta.raisedDelta,
-      contributorCount:
-        baseStats.contributorCount + optimisticDelta.countDelta,
-    };
-  }, [baseStats, optimisticDelta]);
-
-  const info = data?.info ?? null;
+  const stats: CampaignStats | null =
+    baseStats && optimisticDelta
+      ? {
+          ...baseStats,
+          totalRaised: baseStats.totalRaised + optimisticDelta.raisedDelta,
+          contributorCount:
+            baseStats.contributorCount + optimisticDelta.countDelta,
+        }
+      : baseStats;
 
   return {
-    info,
+    info: data?.info ?? null,
     stats,
     loading,
     error,
@@ -105,21 +93,21 @@ export function useCampaign(
   };
 }
 
-type SignTx = (xdr: string) => Promise<string>;
-
-/**
- * Shared factory for campaign mutations. All campaign mutations follow the
- * same shape: run a contract call, then invalidate the campaign query so the
- * cached info/stats are refreshed. Extracted here to dedupe the previously
- * copy-pasted mutation hooks.
- */
-function useCampaignMutation<TVars>(
-  contractId: string,
-  mutationFn: (vars: TVars) => Promise<unknown>,
-) {
+export function useContribute(contractId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn,
+    mutationFn: async ({
+      contributor,
+      amount,
+      signTx,
+    }: {
+      contributor: string;
+      amount: bigint;
+      signTx: (xdr: string) => Promise<string>;
+    }) => {
+      const { contribute } = await import("@/lib/contract");
+      return contribute(contractId, contributor, amount, signTx);
+    },
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.campaign(contractId),
@@ -127,64 +115,104 @@ function useCampaignMutation<TVars>(
   });
 }
 
-export function useContribute(contractId: string) {
-  return useCampaignMutation<{
-    contributor: string;
-    amount: bigint;
-    signTx: SignTx;
-  }>(contractId, async ({ contributor, amount, signTx }) => {
-    const { contribute } = await import("@/lib/contract");
-    return contribute(contractId, contributor, amount, signTx);
-  });
-}
-
 export function useWithdraw(contractId: string) {
-  return useCampaignMutation<{ creator: string; signTx: SignTx }>(
-    contractId,
-    async ({ creator, signTx }) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      creator,
+      signTx,
+    }: {
+      creator: string;
+      signTx: (xdr: string) => Promise<string>;
+    }) => {
       const { withdraw } = await import("@/lib/contract");
       return withdraw(contractId, creator, signTx);
     },
-  );
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.campaign(contractId),
+      }),
+  });
 }
 
 export function useRefund(contractId: string) {
-  return useCampaignMutation<{ contributor: string; signTx: SignTx }>(
-    contractId,
-    async ({ contributor, signTx }) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      contributor,
+      signTx,
+    }: {
+      contributor: string;
+      signTx: (xdr: string) => Promise<string>;
+    }) => {
       const { refundSingle } = await import("@/lib/contract");
       return refundSingle(contractId, contributor, signTx);
     },
-  );
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.campaign(contractId),
+      }),
+  });
 }
 
 export function useBatchRefund(contractId: string) {
-  return useCampaignMutation<{
-    caller: string;
-    contributors: string[];
-    signTx: SignTx;
-  }>(contractId, async ({ caller, contributors, signTx }) => {
-    const { refundBatch } = await import("@/lib/contract");
-    return refundBatch(contractId, caller, contributors, signTx);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      caller,
+      contributors,
+      signTx,
+    }: {
+      caller: string;
+      contributors: string[];
+      signTx: (xdr: string) => Promise<string>;
+    }) => {
+      const { refundBatch } = await import("@/lib/contract");
+      return refundBatch(contractId, caller, contributors, signTx);
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.campaign(contractId),
+      }),
   });
 }
 
 export function usePause(contractId: string) {
-  return useCampaignMutation<{ admin: string; signTx: SignTx }>(
-    contractId,
-    async ({ admin, signTx }) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      admin,
+      signTx,
+    }: {
+      admin: string;
+      signTx: (xdr: string) => Promise<string>;
+    }) => {
       const { pauseCampaign } = await import("@/lib/contract");
       return pauseCampaign(contractId, admin, signTx);
     },
-  );
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.campaign(contractId),
+      }),
+  });
 }
 
 export function useUnpause(contractId: string) {
-  return useCampaignMutation<{ admin: string; signTx: SignTx }>(
-    contractId,
-    async ({ admin, signTx }) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      admin,
+      signTx,
+    }: {
+      admin: string;
+      signTx: (xdr: string) => Promise<string>;
+    }) => {
       const { unpauseCampaign } = await import("@/lib/contract");
       return unpauseCampaign(contractId, admin, signTx);
     },
-  );
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.campaign(contractId),
+      }),
+  });
 }

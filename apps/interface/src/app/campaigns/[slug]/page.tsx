@@ -12,13 +12,11 @@
  */
 
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { resolveCampaignSlug, getAllSlugs } from "@/lib/slugs";
 import { fetchCampaign } from "@/lib/graphql/client";
 import { APP_BASE_URL, DEFAULT_HERO_IMAGE } from "@/lib/constants";
 import { ALL_CAMPAIGNS } from "@/lib/campaigns";
-import { CampaignProvider } from "@/components/campaigns/CampaignContext";
-import CampaignDetailContent from "@/components/campaigns/CampaignDetailContent";
 
 // ── Static generation ─────────────────────────────────────────────────────
 
@@ -88,11 +86,5 @@ export default async function CampaignSlugPage({
   const campaignId = resolveCampaignSlug(slug);
   if (!campaignId) notFound();
 
-  // Supply campaign data through context so the shared detail content and its
-  // children no longer require campaign props to be drilled down.
-  return (
-    <CampaignProvider campaignId={campaignId}>
-      <CampaignDetailContent />
-    </CampaignProvider>
-  );
+  redirect(`/en/campaigns/${campaignId}`);
 }

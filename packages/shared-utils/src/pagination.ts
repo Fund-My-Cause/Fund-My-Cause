@@ -168,7 +168,7 @@ export function resolvePaginationArgs(args: PaginationArgs = {}): {
 export function buildConnection<T>(
   items: T[],
   offset: number,
-  limit: number,
+  _limit: number,
   totalCount: number,
 ): Connection<T> {
   const edges: PageEdge<T>[] = items.map((node, i) => ({
@@ -198,7 +198,7 @@ export function buildConnection<T>(
 export function buildPage<T>(
   items: T[],
   offset: number,
-  limit: number,
+  _limit: number,
   totalCount: number,
 ): Page<T> {
   const startCursor = items.length > 0 ? encodeCursor(offset) : null;

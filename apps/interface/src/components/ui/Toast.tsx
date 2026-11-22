@@ -37,6 +37,12 @@ export interface ToastApi {
     typeOrOptions?: ToastType | ToastOptions,
     txHash?: string,
   ) => string;
+  /** @deprecated Use `show` instead. Retained for existing call sites. */
+  addToast: (
+    message: string,
+    typeOrOptions?: ToastType | ToastOptions,
+    txHash?: string,
+  ) => string;
   /** Dismiss a toast by id. */
   dismiss: (id: string) => void;
   /** Dismiss all toasts. */
@@ -110,7 +116,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <ToastContext.Provider value={{ toasts, show, dismiss, dismissAll }}>
+    <ToastContext.Provider
+      value={{ toasts, show, addToast: show, dismiss, dismissAll }}
+    >
       {children}
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </ToastContext.Provider>
@@ -120,6 +128,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 const fallbackToast: ToastApi = {
   toasts: [],
   show: () => "",
+  addToast: () => "",
   dismiss: () => {},
   dismissAll: () => {},
 };
@@ -155,7 +164,6 @@ export function ToastContainer({
     </div>
   );
 }
-=======
 
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const icons = {

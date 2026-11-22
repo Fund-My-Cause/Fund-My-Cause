@@ -1,11 +1,7 @@
-import { errorTracker, ErrorContext } from '@packages/shared-utils';
+import { errorTracker, ErrorContext } from '@/lib/error-tracking';
 
 /**
  * Error tracking hook for React components
- *
- * Thin wrapper around the shared error tracker from `@packages/shared-utils`.
- * All error-tracking logic lives in the shared package; this hook only
- * exposes it in a React-friendly shape.
  */
 
 export function useErrorTracking() {

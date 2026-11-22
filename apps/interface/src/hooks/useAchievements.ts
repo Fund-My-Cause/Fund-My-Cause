@@ -12,11 +12,6 @@ import type {
   AchievementUnlockedEvent,
 } from "@/types/gamification";
 import { QUERY_KEYS } from "@/lib/queryKeys";
-import { queryDefaults, mutationDefaults } from "@/lib/queryClient";
-import {
-  computeAchievementStats,
-  buildReferralCode,
-} from "@fm/shared-utils";
 
 interface UseAchievementsParams {
   userAddress?: string;
@@ -202,7 +197,7 @@ async function fetchGamificationProfile(
     totalPoints: 2150,
     contributionStreak: 12,
     lastContributionDate: Date.now() - 86400000,
-    referralCode: buildReferralCode(userAddress),
+    referralCode: "FM" + userAddress.slice(0, 6).toUpperCase(),
     referralsCount: 5,
     leaderboardRank: 87,
     level: 5,
@@ -228,9 +223,11 @@ export function useAchievements({
     error: achievementsError,
   } = useQuery<Achievement[]>({
     queryKey: QUERY_KEYS.achievements(userAddress ?? ""),
-    queryFn: () => fetchUserAchievements(userAddress as string),
+    queryFn: () =>
+      userAddress
+        ? fetchUserAchievements(userAddress)
+        : Promise.resolve([]),
     enabled: enabled && !!userAddress,
-    ...queryDefaults,
   });
 
   // Fetch achievement progress
@@ -240,9 +237,11 @@ export function useAchievements({
     error: progressError,
   } = useQuery<AchievementProgress[]>({
     queryKey: QUERY_KEYS.achievementProgress(userAddress ?? ""),
-    queryFn: () => fetchAchievementProgress(userAddress as string),
+    queryFn: () =>
+      userAddress
+        ? fetchAchievementProgress(userAddress)
+        : Promise.resolve([]),
     enabled: enabled && !!userAddress,
-    ...queryDefaults,
   });
 
   // Fetch gamification profile
@@ -250,11 +249,13 @@ export function useAchievements({
     data: profile,
     isLoading: profileLoading,
     error: profileError,
-  } = useQuery<GamificationProfile | null>({
+  } = useQuery<GamificationProfile>({
     queryKey: QUERY_KEYS.gamificationProfile(userAddress ?? ""),
-    queryFn: () => fetchGamificationProfile(userAddress as string),
+    queryFn: () =>
+      userAddress
+        ? fetchGamificationProfile(userAddress)
+        : Promise.resolve(null as unknown as GamificationProfile),
     enabled: enabled && !!userAddress,
-    ...queryDefaults,
   });
 
   // Mutation to unlock achievement
@@ -293,7 +294,6 @@ export function useAchievements({
         queryKey: QUERY_KEYS.gamificationProfile(userAddress ?? ""),
       });
     },
-    ...mutationDefaults,
   });
 
   // Mutation to share achievement
@@ -308,24 +308,30 @@ export function useAchievements({
       // Mocked pending Issue #12 (no share-tracking entrypoint on the
       // achievements contract yet). Replace with a real API/contract call once #12 lands.
     },
-    ...mutationDefaults,
   });
 
   // Compute statistics
-  const stats = useMemo(
-    () =>
-      computeAchievementStats(
-        Object.keys(ACHIEVEMENT_DEFINITIONS).length,
-        achievements.length
-      ),
-    [achievements]
-  );
+  const stats = useMemo(() => {
+    const total = Object.keys(ACHIEVEMENT_DEFINITIONS).length;
+    const unlocked = achievements.length;
+    const completion = total > 0 ? (unlocked / total) * 100 : 0;
+
+    return {
+      total,
+      unlocked,
+      completion,
+      nextMilestone:
+        unlocked % 5 === 0
+          ? unlocked + 5
+          : Math.ceil(unlocked / 5) * 5,
+    };
+  }, [achievements]);
 
   return {
     // Data
     achievements,
     progressData,
-    profile: profile ?? null,
+    profile,
     stats,
 
     // Loading states
@@ -335,7 +341,7 @@ export function useAchievements({
     profileLoading,
 
     // Errors
-    error: achievementsError ?? progressError ?? profileError ?? null,
+    error: achievementsError || progressError || profileError,
     achievementsError,
     progressError,
     profileError,

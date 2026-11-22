@@ -19,16 +19,9 @@ export interface CampaignProgressProps {
    * the bar clamps to 0–100 for display but accepts over-funded values.
    */
   percent: number;
-  /**
-   * Pre-formatted raised amount, e.g. "15,400 XLM (~$2,156 USD)". Callers
-   * should memoize the formatted string (e.g. with `useMemo`) so the
-   * `React.memo` wrapper can skip re-renders.
-   */
+  /** Pre-formatted raised amount, e.g. "15,400 XLM (~$2,156 USD)". */
   raisedText?: ReactNode;
-  /**
-   * Pre-formatted goal amount. Memoize the formatted string on the caller side
-   * for stable props.
-   */
+  /** Pre-formatted goal amount. */
   goalText?: ReactNode;
   /** Time-remaining element — a live countdown or a static string. */
   timeRemaining?: ReactNode;
@@ -83,7 +76,6 @@ function CampaignProgressComponent({
       >
         <div className="h-2 w-full rounded-full animate-pulse bg-[var(--color-surface-elevated,#e5e7eb)]" />
         <div className="h-4 w-2/3 rounded animate-pulse bg-[var(--color-surface-elevated,#e5e7eb)]" />
-        <span className="sr-only">Loading funding progress</span>
       </div>
     );
   }
@@ -92,11 +84,7 @@ function CampaignProgressComponent({
     return (
       <p
         role="alert"
-        className={cn(
-          "text-sm text-[var(--color-danger-text,#b91c1c)]",
-          classNames?.root,
-          className,
-        )}
+        className={cn("text-sm text-red-500", classNames?.root, className)}
       >
         {error}
       </p>
@@ -112,24 +100,14 @@ function CampaignProgressComponent({
       )}
       {(raisedText || goalText) && (
         <div
-          className={cn(
-            "flex justify-between text-sm text-[var(--color-text-secondary,#4b5563)]",
-            classNames?.amounts,
-          )}
+          className={cn("flex justify-between text-sm", classNames?.amounts)}
         >
           <span className={classNames?.raised}>{raisedText}</span>
           <span className={classNames?.goal}>{goalText}</span>
         </div>
       )}
       {timeRemaining && (
-        <div
-          className={cn(
-            "text-[var(--color-text-secondary,#4b5563)]",
-            classNames?.timeRemaining,
-          )}
-        >
-          {timeRemaining}
-        </div>
+        <div className={classNames?.timeRemaining}>{timeRemaining}</div>
       )}
     </div>
   );

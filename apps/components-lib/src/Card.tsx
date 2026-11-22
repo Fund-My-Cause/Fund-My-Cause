@@ -2,7 +2,6 @@
 
 import React, { HTMLAttributes, ReactNode } from "react";
 import { cn } from "./lib/utils";
-import { tokens } from "./lib/tokens";
 
 /** Visual presentation variant for the Card component. */
 export type CardVariant = "default" | "compact" | "highlighted";
@@ -29,9 +28,9 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const VARIANT_CLASSES: Record<CardVariant, string> = {
-  default: `${tokens.surface.default} ${tokens.border.default} ${tokens.text.primary} shadow-sm p-4`,
-  compact: `${tokens.surface.default} ${tokens.border.default} ${tokens.text.primary} shadow-sm p-3`,
-  highlighted: `${tokens.surface.accent} ${tokens.border.accentStrong} ${tokens.text.primary} shadow-md p-4`,
+  default: "bg-white border border-gray-200 shadow-sm p-4",
+  compact: "bg-white border border-gray-200 shadow-sm p-3",
+  highlighted: "bg-indigo-50 border-2 border-indigo-400 shadow-md p-4",
 };
 
 /**
@@ -48,7 +47,7 @@ const VARIANT_CLASSES: Record<CardVariant, string> = {
  * The legacy `padding` prop is still accepted for backwards compatibility but
  * `variant` is the preferred API going forward.
  */
-function CardComponent({
+export function Card({
   children,
   variant = "default",
   hoverable = false,
@@ -73,8 +72,7 @@ function CardComponent({
       className={cn(
         "rounded-lg",
         baseClasses,
-        hoverable &&
-          "hover:shadow-md transition-shadow cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-600",
+        hoverable && "hover:shadow-md transition-shadow cursor-pointer",
         className,
       )}
       {...props}
@@ -87,14 +85,14 @@ function CardComponent({
 /**
  * Card header component
  */
-function CardHeaderComponent({
+export function CardHeader({
   children,
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("mb-4 pb-4 border-b", tokens.border.default, className)}
+      className={cn("mb-4 pb-4 border-b border-gray-200", className)}
       {...props}
     >
       {children}
@@ -105,7 +103,7 @@ function CardHeaderComponent({
 /**
  * Card body component
  */
-function CardBodyComponent({
+export function CardBody({
   children,
   className,
   ...props
@@ -120,47 +118,20 @@ function CardBodyComponent({
 /**
  * Card footer component
  */
-function CardFooterComponent({
+export function CardFooter({
   children,
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("mt-4 pt-4 border-t", tokens.border.default, className)}
+      className={cn("mt-4 pt-4 border-t border-gray-200", className)}
       {...props}
     >
       {children}
     </div>
   );
 }
-
-/**
- * Memoized Card component. Prevents re-renders of campaign list items when
- * parent state changes but props remain referentially equal.
- */
-export const Card = React.memo(CardComponent) as React.MemoExoticComponent<
-  typeof CardComponent
-> & {
-  Header: typeof CardHeader;
-  Body: typeof CardBody;
-  Footer: typeof CardFooter;
-};
-
-/**
- * Memoized Card header component.
- */
-export const CardHeader = React.memo(CardHeaderComponent);
-
-/**
- * Memoized Card body component.
- */
-export const CardBody = React.memo(CardBodyComponent);
-
-/**
- * Memoized Card footer component.
- */
-export const CardFooter = React.memo(CardFooterComponent);
 
 Card.Header = CardHeader;
 Card.Body = CardBody;

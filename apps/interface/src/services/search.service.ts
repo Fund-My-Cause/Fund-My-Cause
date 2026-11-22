@@ -7,6 +7,7 @@
  */
 
 import type { Campaign } from "@/types/campaign";
+import { fetchAllCampaigns } from "@/lib/graphql/client";
 
 // ── Scoring weights (configuration) ───────────────────────────────────────────
 
@@ -771,5 +772,67 @@ export function recordCategoryView(
       ...preferences.categoryViews,
       [category]: (preferences.categoryViews[category] ?? 0) + 1,
     },
+  };
+}
+
+// ── Server-side campaign search ───────────────────────────────────────────────
+
+/** Parameters accepted by the `/api/search` route. */
+export interface CampaignSearchParams {
+  query: string;
+  category?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+/** Paginated response returned by {@link searchCampaigns}. */
+export interface CampaignSearchResponse {
+  campaigns: Campaign[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  provider: "local";
+  durationMs: number;
+}
+
+/**
+ * Fetches the campaign index and runs the same relevance ranking used by the
+ * client (`advancedSearch`), returning a paginated response for the search API.
+ *
+ * Kept async so the route can swap in a remote search provider later without
+ * changing its contract.
+ */
+export async function searchCampaigns(
+  params: CampaignSearchParams,
+): Promise<CampaignSearchResponse> {
+  const start = performance.now();
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
+
+  const campaigns = (await fetchAllCampaigns()).map(
+    (campaign): Campaign => ({
+      ...campaign,
+      id: campaign.contractId,
+      token: "",
+    }),
+  );
+  const result = advancedSearch(campaigns, {
+    query: params.query,
+    category: params.category,
+    status: (params.status as FilterStatus | undefined) ?? "all",
+    page,
+    pageSize,
+  });
+
+  return {
+    campaigns: result.items.map((item) => item.campaign),
+    total: result.total,
+    page,
+    pageSize,
+    hasMore: page * pageSize < result.total,
+    provider: "local",
+    durationMs: Math.round(performance.now() - start),
   };
 }

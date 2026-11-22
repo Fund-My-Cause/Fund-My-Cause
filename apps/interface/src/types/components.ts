@@ -86,6 +86,19 @@ export interface PledgeModalProps {
 /**
  * Countdown timer component props
  */
+export interface ToastProps {
+  /** Message shown in the notification. */
+  message: string;
+  /** Visual severity of the toast. */
+  type?: "success" | "error" | "info" | "warning";
+  /** Optional Stellar transaction hash to link to. */
+  txHash?: string;
+  /** Auto-dismiss duration in milliseconds (0 disables auto-dismiss). */
+  duration?: number;
+  /** Called when the user dismisses the toast. */
+  onClose?: () => void;
+}
+
 export interface CountdownTimerProps {
   deadline: string;
   onExpired?: () => void;

@@ -81,7 +81,7 @@ export function FormField({
 
   const describedBy =
     [showError ? errorId : null, showHelper ? helperId : null]
-      .filter((value): value is string => Boolean(value))
+      .filter(Boolean)
       .join(" ") || undefined;
 
   const controlProps: FormControlProps = {
@@ -96,14 +96,11 @@ export function FormField({
       {label && (
         <label
           htmlFor={fieldId}
-          className={cn(
-            "text-sm font-medium text-foreground",
-            labelClassName
-          )}
+          className={cn("text-sm font-medium text-gray-700", labelClassName)}
         >
           {label}
           {required && (
-            <span aria-hidden="true" className="text-danger ml-1">
+            <span aria-hidden="true" className="text-red-500 ml-1">
               *
             </span>
           )}
@@ -116,8 +113,7 @@ export function FormField({
         <span
           id={errorId}
           role="alert"
-          aria-live="polite"
-          className={cn("text-sm text-danger", errorClassName)}
+          className={cn("text-sm text-red-500", errorClassName)}
         >
           {error}
         </span>
@@ -126,7 +122,7 @@ export function FormField({
       {showHelper && (
         <span
           id={helperId}
-          className={cn("text-sm text-muted-foreground", helperTextClassName)}
+          className={cn("text-sm text-gray-500", helperTextClassName)}
         >
           {helperText}
         </span>

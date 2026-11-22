@@ -33,35 +33,26 @@ export function EmptyState({
     >
       {icon && (
         <div
-          className={cn(
-            "mb-4 text-muted-foreground",
-            iconClassName,
-          )}
+          className={cn("mb-4 text-gray-400", iconClassName)}
           data-testid="empty-state-icon"
-          aria-hidden="true"
         >
           {icon}
         </div>
       )}
       <div className={cn("space-y-2", contentClassName)}>
-        <h3 className="text-lg font-semibold text-foreground">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           {title}
         </h3>
         {description && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             {description}
           </p>
         )}
       </div>
       {action && (
         <button
-          type="button"
           onClick={action.onClick}
-          className={cn(
-            "mt-4 px-4 py-2 rounded-lg text-sm font-medium transition",
-            "bg-primary text-primary-foreground hover:bg-primary/90",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-          )}
+          className="mt-4 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition"
           data-testid="empty-state-action"
         >
           {action.label}

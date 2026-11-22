@@ -14,3 +14,8 @@ export const LazyCampaignAnalytics = dynamic(
   () => import("@/components/ui/CampaignAnalytics").then((m) => m.CampaignAnalytics),
   { ssr: false, loading: () => null },
 );
+
+export const LazyPledgeModal = dynamic(
+  () => import("@/components/ui/PledgeModal").then((m) => m.PledgeModal),
+  { ssr: false, loading: () => null },
+);

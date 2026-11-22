@@ -29,9 +29,8 @@ import {
   type FilterTab,
   type SortOption,
 } from "@/hooks/useCampaignFilters";
-import { CampaignFilters } from "@/components/campaigns/CampaignFilters";
-import { CampaignList } from "@/components/campaigns/CampaignList";
 import { CampaignsView } from "@/components/campaigns/CampaignsView";
+import type { Campaign } from "@/types/campaign";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -139,63 +138,6 @@ function CampaignsContainer() {
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   );
-
-  return (
-    <>
-      <CampaignFilters
-        activeFilter={filters.filter}
-        activeSort={filters.sort}
-        searchQuery={inputValue}
-        filterTabs={FILTER_TABS}
-        categories={CATEGORIES}
-        activeCategory={filters.category}
-        showAdvanced={showAdvanced}
-        hasAdvanced={hasAdvanced}
-        goalMin={filters.goalMin}
-        goalMax={filters.goalMax}
-        dateFrom={filters.dateFrom}
-        dateTo={filters.dateTo}
-        onFilterChange={(value) => setParam("filter", value)}
-        onSortChange={(value) => setParam("sort", value)}
-        onSearchChange={setInputValue}
-        onCategoryChange={(value) => setParam("category", value)}
-        onToggleAdvanced={() => setShowAdvanced(!showAdvanced)}
-        onGoalMinChange={setGoalMin}
-        onGoalMaxChange={setGoalMax}
-        onDateFromChange={setDateFrom}
-        onDateToChange={setDateTo}
-        onApplyAdvanced={applyAdvanced}
-        onClearAdvanced={clearAdvanced}
-        sortLabels={{
-          recent: t("sortNewest"),
-          popular: "Most Popular",
-          deadline: "Deadline",
-          progress: t("sortMostFunded"),
-        }}
-        searchPlaceholder={t("searchPlaceholder")}
-      />
-
-      {filtered.length > 0 && (
-        <p className="text-sm text-gray-500 mb-4">
-          {filtered.length === 1
-            ? t("found", { count: 1 })
-            : t("foundPlural", { count: filtered.length })}
-        </p>
-      )}
-
-      <CampaignList
-        campaigns={paginated}
-        onPledge={(id) => setPledge(id)}
-        onShare={(id, title) => setShareTarget({ id, title })}
-        isEmpty={filtered.length === 0}
-        emptyStateTitle={t("noResults")}
-        emptyStateDescription={t("noResultsDesc")}
-        emptyStateAction={{
-          label: t("clearFilters"),
-          onClick: () => router.replace("/campaigns"),
-        }}
-        query={filters.query}
-      />
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
   const handlePageChange = (p: number) => {

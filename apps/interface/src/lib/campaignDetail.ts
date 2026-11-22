@@ -1,9 +1,9 @@
 import { fetchCampaign } from "@/lib/graphql/client";
 import { fetchXlmPrice } from "@/lib/price";
-import type { Campaign } from "@/types/campaign";
+import type { CampaignData } from "@fund-my-cause/types";
 
 export interface CampaignDetailViewData {
-  campaign: Campaign;
+  campaign: CampaignData;
   xlmPrice: number | null;
   progress: number;
   deadlinePassed: boolean;
