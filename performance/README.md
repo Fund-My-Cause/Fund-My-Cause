@@ -1,6 +1,37 @@
 # Fund-My-Cause — Performance Load Tests
 
-This directory contains load tests targeting the `graphql-api` service.
+This directory contains load tests targeting the `graphql-api` service and a
+frontend performance-budget regression check for key pages.
+
+## Frontend performance budgets (#1750)
+
+`performance-budgets.json` pins per-route Web Vitals and asset-weight budgets
+for the landing page, campaign listing, campaign detail, campaign creation, and
+dashboard. Runtime thresholds use the Web Vitals "good" values (LCP 2.5 s,
+CLS 0.1, TTFB 0.8 s, FCP 1.8 s); asset budgets mirror
+`apps/interface/bundle-budgets.json`.
+
+```bash
+# Validate the budget file without a running server or browser
+npm run perf:list
+node performance/check-performance-budgets.mjs --self-test
+
+# Measure a running app (production build recommended)
+npm run perf:check
+node performance/check-performance-budgets.mjs \
+  --base-url http://localhost:3000 --route / --route /campaigns
+
+# Unit tests + coverage for the budget logic
+npm run perf:test:coverage
+```
+
+The runner launches Chromium through Playwright, collects LCP/CLS/TTFB/FCP and
+JS/CSS/total transfer sizes, fails on any budget violation, and writes
+`performance/results/performance-report.json`.
+
+---
+
+This directory also contains load tests targeting the `graphql-api` service.
 
 | File | Purpose |
 |---|---|

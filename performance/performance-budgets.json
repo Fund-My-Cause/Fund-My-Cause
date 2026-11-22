@@ -1,0 +1,69 @@
+{
+  "$comment": "Performance budgets for key pages (issue #1750). Runtime thresholds follow the Web Vitals 'good' thresholds; asset budgets match apps/interface/bundle-budgets.json.",
+  "defaults": {
+    "lcpMs": 2500,
+    "cls": 0.1,
+    "ttfbMs": 800,
+    "fcpMs": 1800,
+    "maxJavascriptKB": 350,
+    "maxCssKB": 100,
+    "maxTotalKB": 450
+  },
+  "routes": [
+    {
+      "path": "/",
+      "label": "Landing page",
+      "lcpMs": 2500,
+      "cls": 0.1,
+      "ttfbMs": 800,
+      "fcpMs": 1800,
+      "maxJavascriptKB": 250,
+      "maxCssKB": 80,
+      "maxTotalKB": 330
+    },
+    {
+      "path": "/campaigns",
+      "label": "Campaign listing",
+      "lcpMs": 2500,
+      "cls": 0.1,
+      "ttfbMs": 800,
+      "fcpMs": 1800,
+      "maxJavascriptKB": 300,
+      "maxCssKB": 90,
+      "maxTotalKB": 390
+    },
+    {
+      "path": "/campaigns/example",
+      "label": "Campaign detail",
+      "lcpMs": 3000,
+      "cls": 0.1,
+      "ttfbMs": 800,
+      "fcpMs": 1800,
+      "maxJavascriptKB": 400,
+      "maxCssKB": 100,
+      "maxTotalKB": 500
+    },
+    {
+      "path": "/create",
+      "label": "Create campaign",
+      "lcpMs": 2500,
+      "cls": 0.1,
+      "ttfbMs": 800,
+      "fcpMs": 1800,
+      "maxJavascriptKB": 350,
+      "maxCssKB": 90,
+      "maxTotalKB": 440
+    },
+    {
+      "path": "/dashboard",
+      "label": "Dashboard",
+      "lcpMs": 2500,
+      "cls": 0.1,
+      "ttfbMs": 800,
+      "fcpMs": 1800,
+      "maxJavascriptKB": 350,
+      "maxCssKB": 90,
+      "maxTotalKB": 440
+    }
+  ]
+}
