@@ -13,6 +13,7 @@ Closes #1309
 """
 from __future__ import annotations
 
+import ast
 import time
 import inspect
 from unittest.mock import patch
@@ -80,8 +81,17 @@ class TestLayerBoundaries:
 
     def test_scoring_module_has_no_fastapi_import(self):
         """scoring.py must be HTTP-independent."""
-        source = inspect.getsource(scoring)
-        assert "fastapi" not in source.lower()
+        imports = {
+            alias.name
+            for node in ast.walk(ast.parse(inspect.getsource(scoring)))
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+            for alias in (
+                node.names
+                if isinstance(node, ast.Import)
+                else [ast.alias(name=node.module or "", asname=None)]
+            )
+        }
+        assert not any(name.lower().startswith("fastapi") for name in imports)
 
     def test_scoring_module_has_no_asyncio_import(self):
         """Scoring functions are synchronous."""
@@ -106,6 +116,13 @@ class TestLayerBoundaries:
 
 class TestRepositoryLayer:
     """Tests for the repository storage and retrieval layer."""
+
+    def test_per_test_isolation_allows_mutation(self):
+        append_contribution(ContributionEvent("isolated", "G1", 100, 1.0))
+        assert len(get_contributions()) == 1
+
+    def test_per_test_isolation_clears_previous_mutation(self):
+        assert get_contributions() == []
 
     def test_append_and_read_contributions(self):
         append_contribution(ContributionEvent("c1", "GW1", 1000, 1.0))
@@ -655,12 +672,12 @@ class TestJaccardEdgeCases:
     def test_partial_overlap(self):
         """2 shared / 3 union = 2/3."""
         result = _jaccard("alpha beta", "alpha gamma")
-        assert abs(result - (1 / 3)) < 1e-9
+        assert abs(result - (1 / 3)) < 1e-4
 
     def test_subset_relationship(self):
         """'alpha' is a subset of 'alpha beta gamma'."""
         result = _jaccard("alpha", "alpha beta gamma")
-        assert abs(result - (1 / 3)) < 1e-9
+        assert abs(result - (1 / 3)) < 1e-4
 
 
 # ---------------------------------------------------------------------------

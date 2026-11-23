@@ -28,6 +28,7 @@ from stages.trace_id import (
     TraceIDMiddleware,
     generate_trace_id,
     is_valid_trace_id,
+    trace_id_var,
 )
 
 # ---------------------------------------------------------------------------
@@ -133,7 +134,7 @@ def _make_app() -> FastAPI:
 
     @app.get("/ping")
     def ping():
-        return {"pong": True}
+        return {"pong": True, "trace_id": trace_id_var.get()}
 
     return app
 
@@ -148,6 +149,7 @@ class TestTraceIDMiddleware:
         resp = self._client.get("/ping", headers={TRACE_ID_HEADER: valid_id})
         assert resp.status_code == 200
         assert resp.headers[TRACE_ID_HEADER] == valid_id
+        assert resp.json()["trace_id"] == valid_id
 
     def test_missing_header_gets_fallback(self):
         resp = self._client.get("/ping")

@@ -17,34 +17,36 @@ from repository import clear_all
 @pytest.fixture(autouse=True)
 def isolated_state():
     """Reset all shared in-process state before and after every test."""
-    # -- setup --
     clear_all()
     scoring._last_duplicate_scan_at = 0.0
 
-    # Clear the idempotency store (routes-level singleton) if pipeline has
-    # been imported.  Import is deferred so that tests that never touch the
-    # HTTP layer don't pay the FastAPI startup cost.
+    # Clear optional HTTP-layer state only when the module is already loaded.
+    # This keeps pure scoring tests independent of FastAPI startup costs.
     try:
-        from stages.routes import _IDEMPOTENCY_STORE
-        _IDEMPOTENCY_STORE._store.clear()
-        _IDEMPOTENCY_STORE._expiry_queue.clear()
-    except Exception:  # pragma: no cover
+        routes = __import__("stages.routes", fromlist=["_IDEMPOTENCY_STORE"])
+    except ModuleNotFoundError:
         pass
+    else:
+        routes._IDEMPOTENCY_STORE._store.clear()
+        routes._IDEMPOTENCY_STORE._expiry_queue.clear()
 
-    # Drain the async scoring queue if it has been imported.
     try:
-        from stages.scoring_worker import scoring_queue
+        worker = __import__(
+            "stages.scoring_worker",
+            fromlist=["scoring_queue"],
+        )
+        scoring_queue = worker.scoring_queue
+    except ModuleNotFoundError:
+        pass
+    else:
         while not scoring_queue.empty():
             try:
                 scoring_queue.get_nowait()
                 scoring_queue.task_done()
             except asyncio.QueueEmpty:
                 break
-    except Exception:  # pragma: no cover
-        pass
 
     yield
 
-    # -- teardown (mirror of setup) --
     clear_all()
     scoring._last_duplicate_scan_at = 0.0
