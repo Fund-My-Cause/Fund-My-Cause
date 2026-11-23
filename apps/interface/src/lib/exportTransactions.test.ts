@@ -5,17 +5,10 @@ import {
   applyFilters,
   type ExportRecord,
 } from "@/lib/exportTransactions";
+import { createTransactionFixture } from "../../../../fixtures/test-factories";
 
-const makeRecord = (overrides: Partial<ExportRecord> = {}): ExportRecord => ({
-  txHash: "abc123",
-  contributor: "GABC",
-  amountXlm: 10,
-  timestamp: "2024-06-15T12:00:00Z",
-  campaignId: "campaign-1",
-  campaignTitle: "Test Campaign",
-  status: "Confirmed",
-  ...overrides,
-});
+const makeRecord = (overrides: Partial<ExportRecord> = {}): ExportRecord =>
+  createTransactionFixture(overrides);
 
 const records: ExportRecord[] = [
   makeRecord({ txHash: "tx1", timestamp: "2024-01-10T00:00:00Z", campaignId: "c1", status: "Confirmed" }),

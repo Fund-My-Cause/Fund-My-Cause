@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { CampaignCard } from "./CampaignCard";
 import type { Campaign } from "@/types/campaign";
+import { createCampaignFixture } from "../../../../../fixtures/test-factories";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -43,18 +44,12 @@ jest.mock("@/context/BookmarkContext", () => ({
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-const mockCampaign: Campaign = {
-  id: "test-123",
-  contractId: "CTEST123",
+const mockCampaign: Campaign = createCampaignFixture({
   title: "Save the Rainforest",
   description: "Help us protect endangered species",
-  creator: "GCREATOR123",
   goal: 100,
   raised: 50,
-  deadline: new Date(Date.now() + 86400000).toISOString(),
-  status: "Active",
-  token: "native",
-};
+});
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
