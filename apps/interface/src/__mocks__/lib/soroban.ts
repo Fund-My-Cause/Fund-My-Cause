@@ -1,17 +1,11 @@
-export const getRpcServer = jest.fn(() => ({
-  getAccount: jest.fn(),
-  getLatestLedger: jest.fn(),
-  simulateTransaction: jest.fn(),
-  prepareTransaction: jest.fn(),
-  sendTransaction: jest.fn(),
-  getTransaction: jest.fn(),
-}));
+import {
+  createMockHorizonServer,
+  createMockRpcServer,
+} from "../../test-utils/stellar-mocks";
 
-export const getHorizonServer = jest.fn(() => ({
-  loadAccount: jest.fn(),
-  fetchBaseFee: jest.fn(),
-  submitTransaction: jest.fn(),
-}));
+export const getRpcServer = jest.fn(() => createMockRpcServer());
+
+export const getHorizonServer = jest.fn(() => createMockHorizonServer());
 
 export const getStaticCampaignIds = jest.fn(() => []);
 export const buildInitializeTx = jest.fn();

@@ -1,6 +1,10 @@
 import { TransactionBuilder, rpc as SorobanRpc } from "@stellar/stellar-sdk";
 import * as sorobanClient from "../client";
 import { simulateTx, submitSignedTx } from "../submit";
+import {
+  createMockHorizonServer,
+  createMockRpcServer,
+} from "../../../test-utils/stellar-mocks";
 
 jest.mock("../client");
 jest.mock("@stellar/stellar-sdk");
@@ -12,11 +16,11 @@ describe("soroban submit", () => {
 
   describe("simulateTx", () => {
     it("should return min fee and prepared XDR on success", async () => {
-      const mockRpcServer = {
+      const mockRpcServer = createMockRpcServer({
         simulateTransaction: jest.fn().mockResolvedValue({
           minResourceFee: "1000",
         }),
-      };
+      });
 
       (sorobanClient.getRpcServer as jest.Mock).mockReturnValue(mockRpcServer);
 
@@ -42,11 +46,11 @@ describe("soroban submit", () => {
     });
 
     it("should handle zero fee", async () => {
-      const mockRpcServer = {
+      const mockRpcServer = createMockRpcServer({
         simulateTransaction: jest.fn().mockResolvedValue({
           minResourceFee: "0",
         }),
-      };
+      });
 
       (sorobanClient.getRpcServer as jest.Mock).mockReturnValue(mockRpcServer);
       (TransactionBuilder.fromXDR as jest.Mock).mockReturnValue({});
@@ -66,11 +70,11 @@ describe("soroban submit", () => {
     });
 
     it("should throw error on simulation error", async () => {
-      const mockRpcServer = {
+      const mockRpcServer = createMockRpcServer({
         simulateTransaction: jest.fn().mockResolvedValue({
           error: "ContractError(42)",
         }),
-      };
+      });
 
       (sorobanClient.getRpcServer as jest.Mock).mockReturnValue(mockRpcServer);
       (TransactionBuilder.fromXDR as jest.Mock).mockReturnValue({});
@@ -82,11 +86,11 @@ describe("soroban submit", () => {
     });
 
     it("should throw error for minimum contribution", async () => {
-      const mockRpcServer = {
+      const mockRpcServer = createMockRpcServer({
         simulateTransaction: jest.fn().mockResolvedValue({
           error: "Amount is below minimum",
         }),
-      };
+      });
 
       (sorobanClient.getRpcServer as jest.Mock).mockReturnValue(mockRpcServer);
       (TransactionBuilder.fromXDR as jest.Mock).mockReturnValue({});
@@ -98,11 +102,11 @@ describe("soroban submit", () => {
     });
 
     it("should throw error for deadline passed", async () => {
-      const mockRpcServer = {
+      const mockRpcServer = createMockRpcServer({
         simulateTransaction: jest.fn().mockResolvedValue({
           error: "deadline passed",
         }),
-      };
+      });
 
       (sorobanClient.getRpcServer as jest.Mock).mockReturnValue(mockRpcServer);
       (TransactionBuilder.fromXDR as jest.Mock).mockReturnValue({});
@@ -114,11 +118,11 @@ describe("soroban submit", () => {
     });
 
     it("should throw error for cancelled campaign", async () => {
-      const mockRpcServer = {
+      const mockRpcServer = createMockRpcServer({
         simulateTransaction: jest.fn().mockResolvedValue({
           error: "Cancelled",
         }),
-      };
+      });
 
       (sorobanClient.getRpcServer as jest.Mock).mockReturnValue(mockRpcServer);
       (TransactionBuilder.fromXDR as jest.Mock).mockReturnValue({});
@@ -130,9 +134,9 @@ describe("soroban submit", () => {
     });
 
     it("should throw error on restore needed", async () => {
-      const mockRpcServer = {
+      const mockRpcServer = createMockRpcServer({
         simulateTransaction: jest.fn().mockResolvedValue({}),
-      };
+      });
 
       (sorobanClient.getRpcServer as jest.Mock).mockReturnValue(mockRpcServer);
       (TransactionBuilder.fromXDR as jest.Mock).mockReturnValue({});
@@ -145,11 +149,11 @@ describe("soroban submit", () => {
     });
 
     it("should format fee correctly for large amounts", async () => {
-      const mockRpcServer = {
+      const mockRpcServer = createMockRpcServer({
         simulateTransaction: jest.fn().mockResolvedValue({
           minResourceFee: "50000000",
         }),
-      };
+      });
 
       (sorobanClient.getRpcServer as jest.Mock).mockReturnValue(mockRpcServer);
       (TransactionBuilder.fromXDR as jest.Mock).mockReturnValue({});
@@ -173,11 +177,11 @@ describe("soroban submit", () => {
 
   describe("submitSignedTx", () => {
     it("should submit a signed transaction and return hash", async () => {
-      const mockHorizonServer = {
+      const mockHorizonServer = createMockHorizonServer({
         submitTransaction: jest.fn().mockResolvedValue({
           hash: "transaction-hash-123",
         }),
-      };
+      });
 
       (sorobanClient.getHorizonServer as jest.Mock).mockReturnValue(
         mockHorizonServer,
@@ -193,11 +197,11 @@ describe("soroban submit", () => {
     });
 
     it("should throw error if submission fails", async () => {
-      const mockHorizonServer = {
+      const mockHorizonServer = createMockHorizonServer({
         submitTransaction: jest
           .fn()
           .mockRejectedValue(new Error("Network error")),
-      };
+      });
 
       (sorobanClient.getHorizonServer as jest.Mock).mockReturnValue(
         mockHorizonServer,

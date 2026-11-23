@@ -19,6 +19,7 @@ import {
   buildContributeTx,
 } from "../tx-builders";
 import type { InitializeParams } from "@/types/soroban";
+import { createMockHorizonServer } from "../../../test-utils/stellar-mocks";
 
 jest.mock("../client");
 jest.mock("@stellar/stellar-sdk");
@@ -30,9 +31,9 @@ describe("soroban tx-builders", () => {
     incrementSequenceNumber: () => {},
   };
 
-  const mockHorizonServer = {
+  const mockHorizonServer = createMockHorizonServer({
     loadAccount: jest.fn().mockResolvedValue(mockAccount),
-  };
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
