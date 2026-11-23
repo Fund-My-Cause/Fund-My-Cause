@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { AppError } from "@fund-my-cause/shared-utils";
 
 // ───────────────────────── Types ─────────────────────────
 export interface LoadEnvOptions {
@@ -22,7 +23,7 @@ export interface LoadEnvOptions {
   logOnSuccess?: boolean;
 }
 
-export class EnvValidationError extends Error {
+export class EnvValidationError extends AppError {
   readonly service: string;
   readonly issues: z.ZodIssue[];
 
@@ -30,7 +31,10 @@ export class EnvValidationError extends Error {
     const lines = issues
       .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)
       .join("\n");
-    super(`[${service}] Invalid environment configuration:\n${lines}`);
+    super("ENV_VALIDATION_FAILED", `[${service}] Invalid environment configuration:\n${lines}`, {
+      severity: "fatal",
+      context: { service, issueCount: issues.length },
+    });
     this.name = "EnvValidationError";
     this.service = service;
     this.issues = issues;

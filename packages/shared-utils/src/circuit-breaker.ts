@@ -41,12 +41,14 @@
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 
+import { AppError } from "./errors.js";
+
 /** Thrown when a call is rejected because the circuit is currently OPEN. */
-export class CircuitOpenError extends Error {
+export class CircuitOpenError extends AppError {
   constructor(
     message = "Circuit is open — calls are suspended until cooldown elapses",
   ) {
-    super(message);
+    super("CIRCUIT_OPEN", message, { severity: "warn" });
     this.name = "CircuitOpenError";
   }
 }

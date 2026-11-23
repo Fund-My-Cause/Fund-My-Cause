@@ -226,7 +226,7 @@ pub const KEY_PERF_THRESHOLD: Symbol = soroban_sdk::symbol_short!("PERFTHR");
 /// Storage key for per-function performance stats prefix
 pub const KEY_PERF_STATS: Symbol = soroban_sdk::symbol_short!("PERFST");
 
-// ── Issue #XXX: Multi-Sig Governance ─────────────────────────────────────────
+// ── Multi-Sig Governance (tracked in GitHub issues) ──────────────────────────
 /// Storage key for governance configuration (governors list, required approvals, timelock)
 pub const KEY_GOVERNANCE_CONFIG: Symbol = soroban_sdk::symbol_short!("GOVCFG");
 /// Storage key for governance proposal nonce counter

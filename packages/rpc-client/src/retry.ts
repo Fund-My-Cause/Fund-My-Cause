@@ -1,4 +1,4 @@
-import { retryWithBackoff, sleep } from "@fund-my-cause/shared-utils";
+import { retryWithBackoff, sleep, AppError } from "@fund-my-cause/shared-utils";
 
 /** Retry configuration options. */
 export interface RetryOptions {
@@ -27,9 +27,13 @@ export interface RetryResult<T> {
 }
 
 /** Error thrown when all retry attempts are exhausted. */
-export class RetryExhaustedError extends Error {
+export class RetryExhaustedError extends AppError {
   constructor(message: string, public readonly attempts: number, public readonly lastError: Error) {
-    super(message);
+    super("RETRY_EXHAUSTED", message, {
+      severity: "error",
+      context: { attempts },
+      cause: lastError,
+    });
     this.name = "RetryExhaustedError";
   }
 }
