@@ -2,16 +2,12 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ReferralProgram } from "./ReferralProgram";
 import type { GamificationProfile, Referral } from "@/types/gamification";
+import { createUserFixture } from "../../../../../fixtures/test-factories";
 
-const userProfile: GamificationProfile = {
-  address: "GUSER0000000000000000000000000000000000000000000000000",
-  achievements: [],
-  totalPoints: 100,
-  contributionStreak: 1,
+const userProfile: GamificationProfile = createUserFixture({
   referralCode: "FMABC123",
   referralsCount: 2,
-  level: 1,
-};
+});
 
 const referrals: Referral[] = [
   {

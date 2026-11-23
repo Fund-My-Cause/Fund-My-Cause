@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { EditProfileModal } from "../EditProfileModal";
 import type { ProfileData } from "@/types/profile";
+import { createUserFixture } from "../../../../../../fixtures/test-factories";
 
 // Mock the required modules
 vi.mock("@/lib/profileStore", () => ({
@@ -43,12 +44,14 @@ vi.mock("@/hooks/useFocusTrap", () => ({
 }));
 
 describe("EditProfileModal", () => {
-  const mockAddress = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-  const mockProfile: ProfileData = {
+  const mockUser = createUserFixture({
+    address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     avatarUri: "ipfs://QmOld",
     bio: "Original bio",
     socialLinks: ["https://twitter.com/user"],
-  };
+  });
+  const mockAddress = mockUser.address;
+  const mockProfile: ProfileData = mockUser;
   const mockOnSave = vi.fn();
   const mockOnClose = vi.fn();
 
