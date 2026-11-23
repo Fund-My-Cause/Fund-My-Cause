@@ -4,6 +4,8 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
+  // Keep CI resource contention from making browser tests timing-sensitive.
+  workers: process.env.CI ? 2 : undefined,
   // Fail fast in CI if tests fail on any browser
   maxFailures: process.env.CI ? 5 : undefined,
   // Reporter configuration for better cross-browser visibility
