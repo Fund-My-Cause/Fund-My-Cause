@@ -723,7 +723,9 @@ fn test_v17_register_with_status_auth_is_campaign_not_admin() {
     );
 
     assert_eq!(
-        client.list_by_status(&CampaignStatus::Active, &0, &10).len(),
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
         1
     );
 }
@@ -762,7 +764,9 @@ fn test_v18_duplicate_registration_across_paths_is_idempotent() {
 
     // Status index must have exactly one entry.
     assert_eq!(
-        client.list_by_status(&CampaignStatus::Active, &0, &10).len(),
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
         1,
         "V18: status list must not contain duplicates"
     );

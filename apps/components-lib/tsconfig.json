@@ -27,7 +27,12 @@
     "noEmit": false,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@fund-my-cause/types": ["../../packages/types/src/index.ts"],
+      "@fund-my-cause/types/*": ["../../packages/types/src/*"],
+      "@fund-my-cause/shared-utils": ["../../packages/shared-utils/src/index.ts"],
+      "@fund-my-cause/shared-utils/*": ["../../packages/shared-utils/src/*"],
+      "@fixtures/*": ["../../fixtures/*"]
     }
   },
   "include": ["src"],

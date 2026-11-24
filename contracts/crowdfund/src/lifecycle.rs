@@ -9,7 +9,7 @@ use crate::{
     errors::ContractError,
     helpers::{now, require_auth_creator},
     storage::{
-        CONTRACT_VERSION, DataKey, KEY_ADMIN, KEY_ARCHIVED, KEY_CATEGORY, KEY_CONTRACT_VERSION,
+        DataKey, CONTRACT_VERSION, KEY_ADMIN, KEY_ARCHIVED, KEY_CATEGORY, KEY_CONTRACT_VERSION,
         KEY_CREATOR, KEY_DEADLINE, KEY_DESC, KEY_GOAL, KEY_GOAL_HISTORY, KEY_MAX, KEY_META_HIST,
         KEY_MIN, KEY_PLATFORM, KEY_SOCIAL, KEY_START_TIME, KEY_STATUS, KEY_TITLE, KEY_TOKEN,
         KEY_TOTAL, KEY_VESTING, KEY_VISIBILITY, TTL_INSTANCE_EXTEND_MAX, TTL_INSTANCE_EXTEND_MIN,
@@ -487,14 +487,20 @@ pub(crate) fn get_archived_at(env: Env) -> Option<u64> {
 /// - `Err(ContractError::InvalidDeadline)` if new_deadline <= current_deadline
 pub(crate) fn extend_deadline(env: Env, new_deadline: u64) -> Result<(), ContractError> {
     let inst = env.storage().instance();
-    let status: Status = inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+    let status: Status = inst
+        .get(&KEY_STATUS)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
     if status != Status::Active {
         return Err(ContractError::NotActive);
     }
-    let creator: Address = inst.get(&KEY_CREATOR).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+    let creator: Address = inst
+        .get(&KEY_CREATOR)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
     common::AccessControl::require_role_auth(&creator);
 
-    let old_deadline: u64 = inst.get(&KEY_DEADLINE).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+    let old_deadline: u64 = inst
+        .get(&KEY_DEADLINE)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
     validate_deadline_extension(new_deadline, old_deadline)?;
     inst.set(&KEY_DEADLINE, &new_deadline);
     env.events().publish(
@@ -516,11 +522,15 @@ pub(crate) fn extend_deadline(env: Env, new_deadline: u64) -> Result<(), Contrac
 /// - `Err(ContractError::GoalOverflow)` if new_goal is dangerously large
 pub(crate) fn adjust_goal(env: Env, new_goal: i128) -> Result<(), ContractError> {
     let inst = env.storage().instance();
-    let status: Status = inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+    let status: Status = inst
+        .get(&KEY_STATUS)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
     if status != Status::Active {
         return Err(ContractError::NotActive);
     }
-    let creator: Address = inst.get(&KEY_CREATOR).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+    let creator: Address = inst
+        .get(&KEY_CREATOR)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
     common::AccessControl::require_role_auth(&creator);
 
     if new_goal <= 0 {
@@ -528,7 +538,9 @@ pub(crate) fn adjust_goal(env: Env, new_goal: i128) -> Result<(), ContractError>
     }
     validate_goal_not_overflow(new_goal)?;
 
-    let previous_goal: i128 = inst.get(&KEY_GOAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+    let previous_goal: i128 = inst
+        .get(&KEY_GOAL)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
     inst.set(&KEY_GOAL, &new_goal);
 
     let adjusted_at = now(&env);

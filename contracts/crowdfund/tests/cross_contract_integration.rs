@@ -75,12 +75,7 @@ struct CampaignSetup {
     creator: Address,
 }
 
-fn deploy_campaign(
-    env: &Env,
-    token_id: &Address,
-    goal: i128,
-    deadline: u64,
-) -> CampaignSetup {
+fn deploy_campaign(env: &Env, token_id: &Address, goal: i128, deadline: u64) -> CampaignSetup {
     let contract_id = env.register_contract(None, CrowdfundContract);
     let client = CrowdfundContractClient::new(env, &contract_id);
     let creator = Address::generate(env);
@@ -90,7 +85,7 @@ fn deploy_campaign(
         token_id,
         &goal,
         &deadline,
-        &100,  // min_contribution
+        &100,   // min_contribution
         &0i128, // max_contribution (0 = no limit)
         &String::from_str(env, "Test Campaign"),
         &String::from_str(env, "Integration test campaign"),
@@ -146,7 +141,9 @@ fn test_registry_campaign_with_category() {
         .register_with_category(&campaign.contract_id, &category_id);
 
     // Verify category-based retrieval
-    let campaigns = setup.registry.get_campaigns_by_category(&category_id, &0, &10);
+    let campaigns = setup
+        .registry
+        .get_campaigns_by_category(&category_id, &0, &10);
     assert_eq!(campaigns.len(), 1);
     assert_eq!(campaigns.get(0).unwrap(), campaign.contract_id);
 }
@@ -169,7 +166,9 @@ fn test_registry_status_update_after_campaign_success() {
     // Fund the campaign to reach goal
     let contributor = Address::generate(env);
     setup.token_admin.mint(&contributor, &goal);
-    campaign.client.contribute(&contributor, &goal, &setup.token_id, &None);
+    campaign
+        .client
+        .contribute(&contributor, &goal, &setup.token_id, &None);
 
     // Advance past deadline
     env.ledger().set_timestamp(deadline + 1);
@@ -190,7 +189,9 @@ fn test_registry_status_update_after_campaign_success() {
     assert_eq!(successful.len(), 1);
     assert_eq!(successful.get(0).unwrap(), campaign.contract_id);
 
-    let active = setup.registry.list_by_status(&CampaignStatus::Active, &0, &10);
+    let active = setup
+        .registry
+        .list_by_status(&CampaignStatus::Active, &0, &10);
     assert_eq!(active.len(), 0);
 }
 
@@ -220,7 +221,9 @@ fn test_registry_multiple_campaigns_filtering() {
     let all = setup.registry.list(&0, &10);
     assert_eq!(all.len(), 3);
 
-    let active = setup.registry.list_by_status(&CampaignStatus::Active, &0, &10);
+    let active = setup
+        .registry
+        .list_by_status(&CampaignStatus::Active, &0, &10);
     assert_eq!(active.len(), 2);
 
     let cancelled = setup
@@ -436,7 +439,9 @@ fn test_full_lifecycle_registry_crowdfund_qf() {
         .register_with_status(&campaign2.contract_id, &CampaignStatus::Active);
 
     // Verify registration
-    let active_campaigns = setup.registry.list_by_status(&CampaignStatus::Active, &0, &10);
+    let active_campaigns = setup
+        .registry
+        .list_by_status(&CampaignStatus::Active, &0, &10);
     assert_eq!(active_campaigns.len(), 2);
 
     // Phase 2: Fund campaigns with multiple contributors
@@ -487,13 +492,25 @@ fn test_full_lifecycle_registry_crowdfund_qf() {
     let mut contributions = Map::new(env);
     let mut contributor_counts = Map::new(env);
 
-    contributions.set(campaign1.contract_id.clone(), campaign1.client.total_raised());
-    contributions.set(campaign2.contract_id.clone(), campaign2.client.total_raised());
+    contributions.set(
+        campaign1.contract_id.clone(),
+        campaign1.client.total_raised(),
+    );
+    contributions.set(
+        campaign2.contract_id.clone(),
+        campaign2.client.total_raised(),
+    );
 
     let stats1 = campaign1.client.get_stats();
     let stats2 = campaign2.client.get_stats();
-    contributor_counts.set(campaign1.contract_id.clone(), stats1.contributor_count as u64);
-    contributor_counts.set(campaign2.contract_id.clone(), stats2.contributor_count as u64);
+    contributor_counts.set(
+        campaign1.contract_id.clone(),
+        stats1.contributor_count as u64,
+    );
+    contributor_counts.set(
+        campaign2.contract_id.clone(),
+        stats2.contributor_count as u64,
+    );
 
     let qf_result = setup
         .qf
@@ -567,7 +584,10 @@ fn test_failed_campaign_excluded_from_qf() {
     let mut contributor_counts = Map::new(env);
 
     // Only add campaign1 (successful)
-    contributions.set(campaign1.contract_id.clone(), campaign1.client.total_raised());
+    contributions.set(
+        campaign1.contract_id.clone(),
+        campaign1.client.total_raised(),
+    );
     contributor_counts.set(campaign1.contract_id.clone(), 1u64);
 
     let qf_result = setup
@@ -586,7 +606,9 @@ fn test_failed_campaign_excluded_from_qf() {
         .list_by_status(&CampaignStatus::Successful, &0, &10);
     assert_eq!(successful.len(), 1);
 
-    let failed = setup.registry.list_by_status(&CampaignStatus::Failed, &0, &10);
+    let failed = setup
+        .registry
+        .list_by_status(&CampaignStatus::Failed, &0, &10);
     assert_eq!(failed.len(), 1);
 }
 
@@ -649,5 +671,8 @@ fn test_qf_proportional_distribution_respects_contributor_diversity() {
 
     assert!(campaign1_matching > campaign2_matching);
     assert_eq!(qf_result.recipients_funded, 2);
-    assert_eq!(campaign1_matching + campaign2_matching, qf_result.total_distributed);
+    assert_eq!(
+        campaign1_matching + campaign2_matching,
+        qf_result.total_distributed
+    );
 }

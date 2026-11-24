@@ -17,9 +17,9 @@ mod common;
 use common::{seed_old_schema, test_utils::setup_env};
 
 use crowdfund::{
-    Category, CrowdfundContractClient, DataKey, Status, Visibility, CONTRACT_VERSION,
-    KEY_CATEGORY, KEY_CONTRACT_VERSION, KEY_CREATOR, KEY_DEADLINE, KEY_DESC, KEY_GOAL, KEY_MAX,
-    KEY_MIN, KEY_START_TIME, KEY_STATUS, KEY_TITLE, KEY_TOKEN, KEY_TOTAL, KEY_VISIBILITY,
+    Category, CrowdfundContractClient, DataKey, Status, Visibility, CONTRACT_VERSION, KEY_CATEGORY,
+    KEY_CONTRACT_VERSION, KEY_CREATOR, KEY_DEADLINE, KEY_DESC, KEY_GOAL, KEY_MAX, KEY_MIN,
+    KEY_START_TIME, KEY_STATUS, KEY_TITLE, KEY_TOKEN, KEY_TOTAL, KEY_VISIBILITY,
 };
 use soroban_sdk::{
     testutils::{Address as _, Events as _, Ledger},
@@ -28,7 +28,10 @@ use soroban_sdk::{
 
 fn migrate(env: &Env, contract_id: &Address) {
     let client = CrowdfundContractClient::new(env, contract_id);
-    client.try_migrate_version().expect("migrate call").expect("migrate ok");
+    client
+        .try_migrate_version()
+        .expect("migrate call")
+        .expect("migrate ok");
 }
 
 // ── Migration preserves every instance storage key ──────────────────────────
@@ -44,7 +47,10 @@ fn test_migration_preserves_all_storage_keys() {
         env.storage().instance().get(&KEY_CONTRACT_VERSION).unwrap()
     });
     assert_eq!(before, 5, "should be at old version before migration");
-    assert!(client.check_version(), "v5 must be within MIN_SUPPORTED range");
+    assert!(
+        client.check_version(),
+        "v5 must be within MIN_SUPPORTED range"
+    );
 
     migrate(&env, &seeded.contract_id);
 
@@ -143,7 +149,10 @@ fn test_migration_preserves_version_history() {
     let last = after.get(1).unwrap();
     assert_eq!(last.from_version, 5);
     assert_eq!(last.to_version, CONTRACT_VERSION);
-    assert_eq!(last.timestamp, 500, "migration must record ledger timestamp");
+    assert_eq!(
+        last.timestamp, 500,
+        "migration must record ledger timestamp"
+    );
 }
 
 // ── Migration emits an event ────────────────────────────────────────────────

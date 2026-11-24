@@ -6,8 +6,17 @@
     "skipLibCheck": true,
     "declaration": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "baseUrl": ".",
+    "paths": {
+      "@fund-my-cause/types": ["packages/types/src/index.ts"],
+      "@fund-my-cause/types/*": ["packages/types/src/*"],
+      "@fund-my-cause/shared-utils": ["packages/shared-utils/src/index.ts"],
+      "@fund-my-cause/shared-utils/*": ["packages/shared-utils/src/*"],
+      "@fund-my-cause/rpc-client": ["packages/rpc-client/src/index.ts"],
+      "@fund-my-cause/components": ["apps/components-lib/src/index.ts"],
+      "@fund-my-cause/components/*": ["apps/components-lib/src/*"],
+      "@fixtures/*": ["fixtures/*"]
+    }
   },
-  "include": ["src"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

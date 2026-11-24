@@ -46,9 +46,7 @@ fn contribute_requires_contributor_auth() {
 
     // No auths mocked for this call: the contract must reject it because it
     // cannot obtain the contributor's authorization.
-    let result = c
-        .client
-        .try_contribute(&victim, &1_000, &c.token_id, &None);
+    let result = c.client.try_contribute(&victim, &1_000, &c.token_id, &None);
     assert!(
         result.is_err(),
         "contribute must fail without the contributor's require_auth"
@@ -99,7 +97,8 @@ fn refund_requires_contributor_auth() {
     c.token_admin.mock_all_auths().mint(&contributor, &10_000);
     env.mock_all_auths();
     env.ledger().set_timestamp(500);
-    c.client.contribute(&contributor, &5_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &5_000, &c.token_id, &None);
 
     env.ledger().set_timestamp(deadline + 1);
 
@@ -126,7 +125,8 @@ fn refund_single_rejected_for_unauthorized_caller() {
     c.token_admin.mock_all_auths().mint(&contributor, &10_000);
     env.mock_all_auths();
     env.ledger().set_timestamp(500);
-    c.client.contribute(&contributor, &5_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &5_000, &c.token_id, &None);
 
     env.ledger().set_timestamp(deadline + 1);
 
@@ -224,7 +224,8 @@ fn withdraw_before_goal_reached_is_rejected_without_transfer() {
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &10_000);
     env.ledger().set_timestamp(500);
-    c.client.contribute(&contributor, &10_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &10_000, &c.token_id, &None);
 
     env.ledger().set_timestamp(deadline + 1);
 

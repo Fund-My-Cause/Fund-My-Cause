@@ -5,7 +5,7 @@ import {
   applyFilters,
   type ExportRecord,
 } from "@/lib/exportTransactions";
-import { createTransactionFixture } from "../../../../fixtures/test-factories";
+import { createTransactionFixture } from "@fixtures/test-factories";
 
 const makeRecord = (overrides: Partial<ExportRecord> = {}): ExportRecord =>
   createTransactionFixture(overrides);

@@ -11,7 +11,7 @@ import {
   activeCampaign,
   fundedCampaign,
   draftCampaign,
-} from "../../../../fixtures/campaign";
+} from "@fixtures/campaign";
 
 describe("CampaignHeader", () => {
   it("renders the title, organisation and description when populated", () => {

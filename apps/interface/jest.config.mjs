@@ -24,6 +24,7 @@ const config = {
     "^@fund-my-cause/sdk$": "<rootDir>/../../sdks/js/src/index.ts",
     "^@fund-my-cause/sdk/wallet$": "<rootDir>/../../sdks/js/src/wallet/index.ts",
     "^@fund-my-cause/sdk/(.*)$": "<rootDir>/../../sdks/js/src/$1",
+    "^@fixtures/(.*)$": "<rootDir>/../../fixtures/$1",
     "^@/lib/soroban$": "<rootDir>/src/__mocks__/lib/soroban.ts",
     "^@/lib/graphql/client$": "<rootDir>/src/__mocks__/lib/graphql/client.ts",
     "^@/lib/constants$": "<rootDir>/src/__mocks__/lib/constants.ts",

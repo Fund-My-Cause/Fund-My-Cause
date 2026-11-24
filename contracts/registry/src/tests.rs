@@ -59,12 +59,31 @@ fn test_register_with_status_and_list_by_status() {
     let c1 = Address::generate(&env);
     let c2 = Address::generate(&env);
 
-    client.register_with_status(&c1, &CampaignStatus::Active).unwrap();
-    client.register_with_status(&c2, &CampaignStatus::Failed).unwrap();
+    client
+        .register_with_status(&c1, &CampaignStatus::Active)
+        .unwrap();
+    client
+        .register_with_status(&c2, &CampaignStatus::Failed)
+        .unwrap();
 
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 1);
-    assert_eq!(client.list_by_status(&CampaignStatus::Failed, &0, &10).len(), 1);
-    assert_eq!(client.list_by_status(&CampaignStatus::Successful, &0, &10).len(), 0);
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        1
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Failed, &0, &10)
+            .len(),
+        1
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
+        0
+    );
 }
 
 #[test]
@@ -87,11 +106,29 @@ fn test_update_status_moves_campaign() {
     let (_admin, client) = deploy_and_init(&env);
     let campaign = Address::generate(&env);
 
-    client.register_with_status(&campaign, &CampaignStatus::Active).unwrap();
-    client.update_status(&campaign, &CampaignStatus::Active, &CampaignStatus::Successful).unwrap();
+    client
+        .register_with_status(&campaign, &CampaignStatus::Active)
+        .unwrap();
+    client
+        .update_status(
+            &campaign,
+            &CampaignStatus::Active,
+            &CampaignStatus::Successful,
+        )
+        .unwrap();
 
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 0);
-    assert_eq!(client.list_by_status(&CampaignStatus::Successful, &0, &10).len(), 1);
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        0
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
+        1
+    );
     assert_eq!(client.list(&0, &10).len(), 1);
 }
 
@@ -101,7 +138,11 @@ fn test_update_status_not_found() {
     let (_admin, client) = deploy_and_init(&env);
     let unknown = Address::generate(&env);
 
-    let result = client.try_update_status(&unknown, &CampaignStatus::Active, &CampaignStatus::Successful);
+    let result = client.try_update_status(
+        &unknown,
+        &CampaignStatus::Active,
+        &CampaignStatus::Successful,
+    );
     assert_eq!(result, Err(Ok(ContractError::NotFound)));
 }
 

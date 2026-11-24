@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { EditProfileModal } from "../EditProfileModal";
 import type { ProfileData } from "@/types/profile";
-import { createUserFixture } from "../../../../../../fixtures/test-factories";
+import { createUserFixture } from "@fixtures/test-factories";
 
 // Mock the required modules
 vi.mock("@/lib/profileStore", () => ({

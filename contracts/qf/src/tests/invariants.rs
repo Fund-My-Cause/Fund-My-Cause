@@ -1,7 +1,7 @@
 #![cfg(test)]
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, Map, Vec};
 use proptest::prelude::*;
+use soroban_sdk::{testutils::Address as _, Address, Env, Map, Vec};
 
 // ================================================================
 // Property-Based Invariant Tests
@@ -325,5 +325,10 @@ fn test_invariant_equal_contributions_equal_payouts() {
 
     // Allow small floating-point differences
     let diff = (amount_a - amount_b).abs();
-    assert!(diff <= 1, "Amounts should be nearly equal: {} vs {}", amount_a, amount_b);
+    assert!(
+        diff <= 1,
+        "Amounts should be nearly equal: {} vs {}",
+        amount_a,
+        amount_b
+    );
 }

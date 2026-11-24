@@ -5,7 +5,7 @@ import {
   fundedCampaign,
   refundingCampaign,
   draftCampaign,
-} from "../../../../fixtures/campaign";
+} from "@fixtures/campaign";
 
 // The formatCampaignCard utility operates on plain numbers; the fixtures store
 // BigInt values as decimal strings.  Convert once at the top level.

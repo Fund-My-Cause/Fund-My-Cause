@@ -21,10 +21,7 @@ impl RegistryEvents {
     /// Uses `topics::REGISTRY_PROJECT_REGISTERED` so the indexer can handle
     /// campaign registration events alongside project events via the same
     /// topic filter.
-    pub(crate) fn campaign_registered(
-        env: &soroban_sdk::Env,
-        campaign_id: soroban_sdk::Address,
-    ) {
+    pub(crate) fn campaign_registered(env: &soroban_sdk::Env, campaign_id: soroban_sdk::Address) {
         EventEmitter::emit(
             env,
             topics::REGISTRY_PROJECT_REGISTERED,

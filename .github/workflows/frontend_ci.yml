@@ -55,6 +55,12 @@ jobs:
       - name: Lint (root)
         run: npm run lint
 
+      - name: Check import aliases (#1763)
+        run: npm run lint:imports
+
+      - name: Test code-quality tooling (#1764)
+        run: npm run test:quality
+
       - name: Lint (apps/interface)
         working-directory: apps/interface
         run: npx eslint src --max-warnings 0

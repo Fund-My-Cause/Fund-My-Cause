@@ -43,8 +43,9 @@ src/components/
 
 ## Enforcement
 
-An ESLint rule (`local-rules/pascal-case-component-files`) is registered in
-`apps/interface/eslint.config.js` and runs in CI via the `frontend_ci` workflow.
+An ESLint rule (`local-rules/pascal-case-component-files`) is registered in the
+root `eslint.config.mjs` and runs in CI via the `frontend_ci` workflow. Its
+behaviour is covered by `npm run test:quality`.
 
 The rule is located at `eslint-rules/pascal-case-component-files.js`.
 

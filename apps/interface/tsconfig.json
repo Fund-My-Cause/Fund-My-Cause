@@ -38,7 +38,15 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ]
+      ],
+      "@fund-my-cause/types": ["../../packages/types/src/index.ts"],
+      "@fund-my-cause/types/*": ["../../packages/types/src/*"],
+      "@fund-my-cause/shared-utils": ["../../packages/shared-utils/src/index.ts"],
+      "@fund-my-cause/shared-utils/*": ["../../packages/shared-utils/src/*"],
+      "@fund-my-cause/rpc-client": ["../../packages/rpc-client/src/index.ts"],
+      "@fund-my-cause/components": ["../components-lib/src/index.ts"],
+      "@fund-my-cause/components/*": ["../components-lib/src/*"],
+      "@fixtures/*": ["../../fixtures/*"]
     }
   },
   "include": [

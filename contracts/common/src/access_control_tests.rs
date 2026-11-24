@@ -141,9 +141,7 @@ mod tests {
         const ROLE_COUNT: usize = 5;
         let env = env_all_auths();
 
-        let roles: Vec<Address> = (0..ROLE_COUNT)
-            .map(|_| Address::generate(&env))
-            .collect();
+        let roles: Vec<Address> = (0..ROLE_COUNT).map(|_| Address::generate(&env)).collect();
 
         // Sanity: all addresses are unique.
         for i in 0..roles.len() {

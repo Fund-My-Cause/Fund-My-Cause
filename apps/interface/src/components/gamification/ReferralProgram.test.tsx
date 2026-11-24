@@ -2,7 +2,7 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ReferralProgram } from "./ReferralProgram";
 import type { GamificationProfile, Referral } from "@/types/gamification";
-import { createUserFixture } from "../../../../../fixtures/test-factories";
+import { createUserFixture } from "@fixtures/test-factories";
 
 const userProfile: GamificationProfile = createUserFixture({
   referralCode: "FMABC123",

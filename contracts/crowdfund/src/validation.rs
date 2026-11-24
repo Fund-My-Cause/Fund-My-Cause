@@ -1,9 +1,9 @@
+use crate::errors::ContractError;
+use crate::types::Category;
 /// Validation logic for the crowdfund contract.
 ///
 /// This module contains validation functions for campaign parameters and operations.
 use common::math::BASIS_POINTS_MAX;
-use crate::errors::ContractError;
-use crate::types::Category;
 use soroban_sdk::Address;
 
 /// Validates campaign initialization parameters.

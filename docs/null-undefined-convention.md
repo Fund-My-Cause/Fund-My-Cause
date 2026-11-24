@@ -37,8 +37,8 @@ interface User {
     "@typescript-eslint/no-unnecessary-condition": "error"
   }
 }
-// custom-rules/no-mixed-null-undefined.js
-export default {
+// eslint-rules/no-mixed-null-undefined.js
+module.exports = {
   meta: { type: 'suggestion' },
   create(context) {
     return {

@@ -5,7 +5,7 @@ import { CampaignProgress } from "../CampaignProgress";
 import {
   activeCampaign,
   fundedCampaign,
-} from "../../../../fixtures/campaign";
+} from "@fixtures/campaign";
 
 // Derive display strings from the canonical fixture data so the tests stay in
 // sync with the fixtures rather than duplicating magic numbers inline.

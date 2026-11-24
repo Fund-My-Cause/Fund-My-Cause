@@ -743,7 +743,8 @@ fn prop_stream_vested_fraction_large_total_no_panic() {
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &large_goal);
     env.ledger().set_timestamp(100);
-    c.client.contribute(&contributor, &large_goal, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &large_goal, &c.token_id, &None);
 
     c.client.set_stream_config(&1_001u64, &1_000_001u64);
 
@@ -801,8 +802,14 @@ fn prop_get_vested_amount_large_total_no_panic() {
     // Mid-vesting — must not panic
     env.ledger().set_timestamp(2_700);
     let vested = client.get_vested_amount();
-    assert!(vested >= 0, "get_vested_amount must return non-negative value");
-    assert!(vested <= goal, "get_vested_amount must not exceed total raised");
+    assert!(
+        vested >= 0,
+        "get_vested_amount must return non-negative value"
+    );
+    assert!(
+        vested <= goal,
+        "get_vested_amount must not exceed total raised"
+    );
 }
 
 proptest! {
@@ -915,10 +922,12 @@ fn prop_yield_divisor_zero_total_does_not_panic() {
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &1_000i128);
     env.ledger().set_timestamp(100);
-    c.client.contribute(&contributor, &1_000i128, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &1_000i128, &c.token_id, &None);
 
     c.token_admin.mint(&c.creator, &1_000_000i128);
-    c.client.configure_yield(&c.token_id, &1_000_000i128, &500u32);
+    c.client
+        .configure_yield(&c.token_id, &1_000_000i128, &500u32);
 
     // Claim immediately (elapsed == 0) and at several points — must not panic
     let _ = c.client.try_claim_yield(&contributor);

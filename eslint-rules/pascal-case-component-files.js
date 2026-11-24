@@ -29,17 +29,9 @@ const path = require("path");
  *  all-lowercase sequences). */
 const PASCAL_CASE_RE = /^[A-Z][a-zA-Z0-9]*$/;
 
-/** Suffixes that are stripped before the PascalCase check so that
- *  `MyComponent.test.tsx` and `MyComponent.stories.tsx` are evaluated
- *  as `MyComponent`. */
-const IGNORED_SUFFIXES = [
-  ".test",
-  ".spec",
-  ".stories",
-  ".snapshot",
-  ".axe",
-  ".memo",
-];
+/** Dot-separated qualifiers (`.test`, `.keyboard.test`, `.axe.test`, ...)
+ *  are stripped before the PascalCase check so only the component name is
+ *  evaluated. */
 
 /**
  * Returns the base component name by stripping known suffixes, then the
@@ -50,24 +42,8 @@ const IGNORED_SUFFIXES = [
  *       "PledgeModal.axe.test.tsx"  → "PledgeModal"
  */
 function getComponentName(filename) {
-  let name = path.basename(filename);
-
-  // Strip .tsx / .ts extension
-  name = name.replace(/\.(tsx?|jsx?)$/, "");
-
-  // Strip known suffixes repeatedly (handles `.memo.test`)
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const suffix of IGNORED_SUFFIXES) {
-      if (name.endsWith(suffix)) {
-        name = name.slice(0, -suffix.length);
-        changed = true;
-      }
-    }
-  }
-
-  return name;
+  const name = path.basename(filename).replace(/\.(tsx?|jsx?)$/, "");
+  return name.split(".")[0];
 }
 
 module.exports = {

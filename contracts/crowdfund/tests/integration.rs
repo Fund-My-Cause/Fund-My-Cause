@@ -185,7 +185,8 @@ fn test_contribute_deadline_boundary() {
 
     // One second before the deadline: accepted.
     env.ledger().set_timestamp(deadline - 1);
-    c.client.contribute(&contributor, &1_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &1_000, &c.token_id, &None);
     assert_eq!(c.client.total_raised(), 1_000);
 
     // Exactly at the deadline: rejected.
@@ -251,7 +252,8 @@ fn test_refund_deadline_boundary() {
     let amount = 1_000i128;
     c.token_admin.mint(&contributor, &amount);
     env.ledger().set_timestamp(500);
-    c.client.contribute(&contributor, &amount, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &amount, &c.token_id, &None);
 
     // Before the deadline: refund rejected.
     env.ledger().set_timestamp(deadline - 1);

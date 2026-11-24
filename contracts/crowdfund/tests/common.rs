@@ -95,7 +95,8 @@ pub fn setup_upgrade_campaign(env: &Env) -> Campaign<'_> {
 pub fn fund(env: &Env, c: &Campaign<'_>, amount: i128) -> Address {
     let contributor = Address::generate(env);
     c.token_admin.mint(&contributor, &amount);
-    c.client.contribute(&contributor, &amount, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &amount, &c.token_id, &None);
     contributor
 }
 

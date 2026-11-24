@@ -4,7 +4,7 @@
 //! in the Fund-My-Cause ecosystem. Events are structured for easy consumption
 //! by indexers and off-chain services.
 
-use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Val, Vec};
+use soroban_sdk::{Address, Env, String, Symbol, Val};
 
 /// Shared starting schema version for all contract events. Each contract
 /// re-exports this as its own `EVENT_SCHEMA_VERSION` so a future divergence
@@ -84,11 +84,7 @@ pub struct EventEmitter;
 
 impl EventEmitter {
     /// Emit a simple event with a single payload
-    pub fn emit<T: soroban_sdk::IntoVal<Env, Val>>(
-        env: &Env,
-        topic: Symbol,
-        data: T,
-    ) {
+    pub fn emit<T: soroban_sdk::IntoVal<Env, Val>>(env: &Env, topic: Symbol, data: T) {
         env.events().publish((topic, "v1"), data);
     }
 
@@ -99,15 +95,12 @@ impl EventEmitter {
         version: &str,
         data: T,
     ) {
-        env.events().publish((topic, Symbol::new(env, version)), data);
+        env.events()
+            .publish((topic, Symbol::new(env, version)), data);
     }
 
     /// Emit a typed event with standard fields
-    pub fn emit_typed<T: soroban_sdk::IntoVal<Env, Val>>(
-        env: &Env,
-        topic: Symbol,
-        event: T,
-    ) {
+    pub fn emit_typed<T: soroban_sdk::IntoVal<Env, Val>>(env: &Env, topic: Symbol, event: T) {
         env.events().publish((topic, "v1"), event);
     }
 
@@ -122,10 +115,8 @@ impl EventEmitter {
         name: &str,
         data: T,
     ) {
-        env.events().publish(
-            (Symbol::new(env, namespace), Symbol::new(env, name)),
-            data,
-        );
+        env.events()
+            .publish((Symbol::new(env, namespace), Symbol::new(env, name)), data);
     }
 
     /// Emit a state-validation summary event.
@@ -142,7 +133,11 @@ impl EventEmitter {
 
     /// Emit registry initialized event
     pub fn registry_initialized(env: &Env, admin: Address) {
-        Self::emit(env, topics::REGISTRY_INITIALIZED, (admin, env.ledger().timestamp()));
+        Self::emit(
+            env,
+            topics::REGISTRY_INITIALIZED,
+            (admin, env.ledger().timestamp()),
+        );
     }
 
     /// Emit project registered event
@@ -156,16 +151,18 @@ impl EventEmitter {
         Self::emit(
             env,
             topics::REGISTRY_PROJECT_REGISTERED,
-            (project_id, creator, name, category, env.ledger().timestamp()),
+            (
+                project_id,
+                creator,
+                name,
+                category,
+                env.ledger().timestamp(),
+            ),
         );
     }
 
     /// Emit project updated event
-    pub fn project_updated(
-        env: &Env,
-        project_id: u64,
-        updated_by: Address,
-    ) {
+    pub fn project_updated(env: &Env, project_id: u64, updated_by: Address) {
         Self::emit(
             env,
             topics::REGISTRY_PROJECT_UPDATED,
@@ -174,11 +171,7 @@ impl EventEmitter {
     }
 
     /// Emit project verified event
-    pub fn project_verified(
-        env: &Env,
-        project_id: u64,
-        verifier: Address,
-    ) {
+    pub fn project_verified(env: &Env, project_id: u64, verifier: Address) {
         Self::emit(
             env,
             topics::REGISTRY_PROJECT_VERIFIED,
@@ -187,11 +180,7 @@ impl EventEmitter {
     }
 
     /// Emit project archived event
-    pub fn project_archived(
-        env: &Env,
-        project_id: u64,
-        archived_by: Address,
-    ) {
+    pub fn project_archived(env: &Env, project_id: u64, archived_by: Address) {
         Self::emit(
             env,
             topics::REGISTRY_PROJECT_ARCHIVED,
@@ -202,12 +191,7 @@ impl EventEmitter {
     // ── Campaign Events ────────────────────────────────────────────
 
     /// Emit campaign initialized event
-    pub fn campaign_initialized(
-        env: &Env,
-        campaign_id: u64,
-        creator: Address,
-        goal: i128,
-    ) {
+    pub fn campaign_initialized(env: &Env, campaign_id: u64, creator: Address, goal: i128) {
         Self::emit(
             env,
             topics::CAMPAIGN_INITIALIZED,
@@ -216,12 +200,7 @@ impl EventEmitter {
     }
 
     /// Emit contribution made event
-    pub fn contribution_made(
-        env: &Env,
-        campaign_id: u64,
-        contributor: Address,
-        amount: i128,
-    ) {
+    pub fn contribution_made(env: &Env, campaign_id: u64, contributor: Address, amount: i128) {
         Self::emit(
             env,
             topics::CAMPAIGN_CONTRIBUTED,
@@ -230,12 +209,7 @@ impl EventEmitter {
     }
 
     /// Emit funds withdrawn event
-    pub fn funds_withdrawn(
-        env: &Env,
-        campaign_id: u64,
-        recipient: Address,
-        amount: i128,
-    ) {
+    pub fn funds_withdrawn(env: &Env, campaign_id: u64, recipient: Address, amount: i128) {
         Self::emit(
             env,
             topics::CAMPAIGN_WITHDRAWN,
@@ -244,12 +218,7 @@ impl EventEmitter {
     }
 
     /// Emit refund event
-    pub fn refund_issued(
-        env: &Env,
-        campaign_id: u64,
-        contributor: Address,
-        amount: i128,
-    ) {
+    pub fn refund_issued(env: &Env, campaign_id: u64, contributor: Address, amount: i128) {
         Self::emit(
             env,
             topics::CAMPAIGN_REFUNDED,
@@ -258,11 +227,7 @@ impl EventEmitter {
     }
 
     /// Emit campaign cancelled event
-    pub fn campaign_cancelled(
-        env: &Env,
-        campaign_id: u64,
-        cancelled_by: Address,
-    ) {
+    pub fn campaign_cancelled(env: &Env, campaign_id: u64, cancelled_by: Address) {
         Self::emit(
             env,
             topics::CAMPAIGN_CANCELLED,
@@ -271,11 +236,7 @@ impl EventEmitter {
     }
 
     /// Emit campaign paused event
-    pub fn campaign_paused(
-        env: &Env,
-        campaign_id: u64,
-        paused_by: Address,
-    ) {
+    pub fn campaign_paused(env: &Env, campaign_id: u64, paused_by: Address) {
         Self::emit(
             env,
             topics::CAMPAIGN_PAUSED,
@@ -284,11 +245,7 @@ impl EventEmitter {
     }
 
     /// Emit campaign resumed event
-    pub fn campaign_resumed(
-        env: &Env,
-        campaign_id: u64,
-        resumed_by: Address,
-    ) {
+    pub fn campaign_resumed(env: &Env, campaign_id: u64, resumed_by: Address) {
         Self::emit(
             env,
             topics::CAMPAIGN_RESUMED,
@@ -309,17 +266,18 @@ impl EventEmitter {
         Self::emit(
             env,
             topics::DISPUTE_CREATED,
-            (dispute_id, campaign_id, initiator, reason, env.ledger().timestamp()),
+            (
+                dispute_id,
+                campaign_id,
+                initiator,
+                reason,
+                env.ledger().timestamp(),
+            ),
         );
     }
 
     /// Emit dispute resolved event
-    pub fn dispute_resolved(
-        env: &Env,
-        dispute_id: u64,
-        resolver: Address,
-        outcome: String,
-    ) {
+    pub fn dispute_resolved(env: &Env, dispute_id: u64, resolver: Address, outcome: String) {
         Self::emit(
             env,
             topics::DISPUTE_RESOLVED,
@@ -328,12 +286,7 @@ impl EventEmitter {
     }
 
     /// Emit dispute appealed event
-    pub fn dispute_appealed(
-        env: &Env,
-        dispute_id: u64,
-        appellant: Address,
-        reason: String,
-    ) {
+    pub fn dispute_appealed(env: &Env, dispute_id: u64, appellant: Address, reason: String) {
         Self::emit(
             env,
             topics::DISPUTE_APPEALED,
@@ -354,21 +307,27 @@ impl EventEmitter {
         Self::emit(
             env,
             topics::MILESTONE_ADDED,
-            (campaign_id, milestone_id, title, amount, env.ledger().timestamp()),
+            (
+                campaign_id,
+                milestone_id,
+                title,
+                amount,
+                env.ledger().timestamp(),
+            ),
         );
     }
 
     /// Emit milestone verified event
-    pub fn milestone_verified(
-        env: &Env,
-        campaign_id: u64,
-        milestone_id: u64,
-        verifier: Address,
-    ) {
+    pub fn milestone_verified(env: &Env, campaign_id: u64, milestone_id: u64, verifier: Address) {
         Self::emit(
             env,
             topics::MILESTONE_VERIFIED,
-            (campaign_id, milestone_id, verifier, env.ledger().timestamp()),
+            (
+                campaign_id,
+                milestone_id,
+                verifier,
+                env.ledger().timestamp(),
+            ),
         );
     }
 
@@ -383,18 +342,20 @@ impl EventEmitter {
         Self::emit(
             env,
             topics::MILESTONE_RELEASED,
-            (campaign_id, milestone_id, recipient, amount, env.ledger().timestamp()),
+            (
+                campaign_id,
+                milestone_id,
+                recipient,
+                amount,
+                env.ledger().timestamp(),
+            ),
         );
     }
 
     // ── Admin Events ──────────────────────────────────────────────
 
     /// Emit admin transferred event
-    pub fn admin_transferred(
-        env: &Env,
-        old_admin: Address,
-        new_admin: Address,
-    ) {
+    pub fn admin_transferred(env: &Env, old_admin: Address, new_admin: Address) {
         Self::emit(
             env,
             topics::ADMIN_TRANSFERRED,
@@ -403,12 +364,7 @@ impl EventEmitter {
     }
 
     /// Emit fee configured event
-    pub fn fee_configured(
-        env: &Env,
-        fee_type: String,
-        fee_rate: u32,
-        configured_by: Address,
-    ) {
+    pub fn fee_configured(env: &Env, fee_type: String, fee_rate: u32, configured_by: Address) {
         Self::emit(
             env,
             topics::FEE_CONFIGURED,
@@ -419,12 +375,7 @@ impl EventEmitter {
     // ── Governance Events ──────────────────────────────────────────
 
     /// Emit proposal created event
-    pub fn proposal_created(
-        env: &Env,
-        proposal_id: u64,
-        proposer: Address,
-        description: String,
-    ) {
+    pub fn proposal_created(env: &Env, proposal_id: u64, proposer: Address, description: String) {
         Self::emit(
             env,
             topics::PROPOSAL_CREATED,
@@ -443,16 +394,18 @@ impl EventEmitter {
         Self::emit(
             env,
             topics::PROPOSAL_VOTED,
-            (proposal_id, voter, support, weight, env.ledger().timestamp()),
+            (
+                proposal_id,
+                voter,
+                support,
+                weight,
+                env.ledger().timestamp(),
+            ),
         );
     }
 
     /// Emit proposal executed event
-    pub fn proposal_executed(
-        env: &Env,
-        proposal_id: u64,
-        executor: Address,
-    ) {
+    pub fn proposal_executed(env: &Env, proposal_id: u64, executor: Address) {
         Self::emit(
             env,
             topics::PROPOSAL_EXECUTED,
@@ -463,10 +416,7 @@ impl EventEmitter {
     // ── Security Events ────────────────────────────────────────────
 
     /// Emit emergency paused event
-    pub fn emergency_paused(
-        env: &Env,
-        paused_by: Address,
-    ) {
+    pub fn emergency_paused(env: &Env, paused_by: Address) {
         Self::emit(
             env,
             topics::EMERGENCY_PAUSED,
@@ -475,10 +425,7 @@ impl EventEmitter {
     }
 
     /// Emit emergency unpaused event
-    pub fn emergency_unpaused(
-        env: &Env,
-        unpaused_by: Address,
-    ) {
+    pub fn emergency_unpaused(env: &Env, unpaused_by: Address) {
         Self::emit(
             env,
             topics::EMERGENCY_UNPAUSED,
@@ -487,11 +434,7 @@ impl EventEmitter {
     }
 
     /// Emit emergency withdrawn event
-    pub fn emergency_withdrawn(
-        env: &Env,
-        recipient: Address,
-        amount: i128,
-    ) {
+    pub fn emergency_withdrawn(env: &Env, recipient: Address, amount: i128) {
         Self::emit(
             env,
             topics::EMERGENCY_WITHDRAWN,
@@ -502,11 +445,7 @@ impl EventEmitter {
     // ── System Events ──────────────────────────────────────────────
 
     /// Emit contract upgraded event
-    pub fn contract_upgraded(
-        env: &Env,
-        new_version: String,
-        upgraded_by: Address,
-    ) {
+    pub fn contract_upgraded(env: &Env, new_version: String, upgraded_by: Address) {
         Self::emit(
             env,
             topics::CONTRACT_UPGRADED,
@@ -515,16 +454,16 @@ impl EventEmitter {
     }
 
     /// Emit contract migrated event
-    pub fn contract_migrated(
-        env: &Env,
-        from_version: u32,
-        to_version: u32,
-        migrated_by: Address,
-    ) {
+    pub fn contract_migrated(env: &Env, from_version: u32, to_version: u32, migrated_by: Address) {
         Self::emit(
             env,
             topics::CONTRACT_MIGRATED,
-            (from_version, to_version, migrated_by, env.ledger().timestamp()),
+            (
+                from_version,
+                to_version,
+                migrated_by,
+                env.ledger().timestamp(),
+            ),
         );
     }
 
@@ -540,17 +479,17 @@ impl EventEmitter {
         Self::emit(
             env,
             topics::ACHIEVEMENT_UNLOCKED,
-            (user, achievement_type, points_earned, env.ledger().timestamp()),
+            (
+                user,
+                achievement_type,
+                points_earned,
+                env.ledger().timestamp(),
+            ),
         );
     }
 
     /// Emit achievement points awarded event
-    pub fn achievement_points_awarded(
-        env: &Env,
-        user: Address,
-        points: u32,
-        total_points: u32,
-    ) {
+    pub fn achievement_points_awarded(env: &Env, user: Address, points: u32, total_points: u32) {
         Self::emit(
             env,
             topics::ACHIEVEMENT_POINTS_AWARDED,
@@ -570,7 +509,12 @@ impl EventEmitter {
         Self::emit(
             env,
             topics::QF_CALCULATED,
-            (total_distributed, remaining_pool, recipients_funded, env.ledger().timestamp()),
+            (
+                total_distributed,
+                remaining_pool,
+                recipients_funded,
+                env.ledger().timestamp(),
+            ),
         );
     }
 }

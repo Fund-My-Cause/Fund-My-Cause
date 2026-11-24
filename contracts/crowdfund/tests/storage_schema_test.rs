@@ -23,7 +23,8 @@ fn test_datakey_contribution_preserves_data() {
 
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &1_000);
-    c.client.contribute(&contributor, &1_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &1_000, &c.token_id, &None);
 
     assert_eq!(c.client.contribution(&contributor), 1_000);
     assert!(c.client.is_contributor(&contributor));
@@ -37,7 +38,8 @@ fn test_datakey_contribution_history_preserves_data() {
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &1_500);
 
-    c.client.contribute(&contributor, &1_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &1_000, &c.token_id, &None);
 
     use soroban_sdk::testutils::Ledger;
     env.ledger().set_timestamp(200);
@@ -66,7 +68,8 @@ fn test_all_datakey_variants_roundtrip() {
 
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &2_000);
-    c.client.contribute(&contributor, &2_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &2_000, &c.token_id, &None);
 
     // DataKey::Contribution / ContributorPresence
     assert_eq!(c.client.contribution(&contributor), 2_000);
@@ -85,7 +88,10 @@ fn test_all_datakey_variants_roundtrip() {
     assert_eq!(c.client.deadline(), 1_000_000);
 
     // DataKey::Platform
-    let platform_cfg = c.client.platform_config().expect("platform config should exist");
+    let platform_cfg = c
+        .client
+        .platform_config()
+        .expect("platform config should exist");
     assert_eq!(platform_cfg.fee_bps, 250);
     assert_eq!(platform_cfg.fee_mode, FeeMode::OnSuccess);
 
@@ -138,7 +144,8 @@ fn test_datakey_extension_voting_preserves_data() {
 
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &5_000);
-    c.client.contribute(&contributor, &5_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &5_000, &c.token_id, &None);
 
     use soroban_sdk::testutils::Ledger;
     env.ledger().set_timestamp(100);
@@ -163,8 +170,7 @@ fn test_datakey_governance_preserves_data() {
 #[test]
 fn test_storage_key_uniqueness() {
     use crowdfund::{
-        KEY_CREATOR, KEY_DEADLINE, KEY_GOAL, KEY_STATUS, KEY_TOKEN, KEY_TOTAL,
-        KEY_VERSION_HISTORY,
+        KEY_CREATOR, KEY_DEADLINE, KEY_GOAL, KEY_STATUS, KEY_TOKEN, KEY_TOTAL, KEY_VERSION_HISTORY,
     };
 
     assert_ne!(KEY_CREATOR, KEY_TOKEN);
@@ -191,7 +197,8 @@ fn test_datakey_yield_info_preserves_data() {
 
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &1_000);
-    c.client.contribute(&contributor, &1_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &1_000, &c.token_id, &None);
 
     assert_eq!(c.client.contribution(&contributor), 1_000);
 }

@@ -79,12 +79,16 @@ test-frontend: ## Run frontend tests
 	@echo "Running frontend tests..."
 	cd apps/interface && npm test
 
-# Run linters (Rust clippy + ESLint)
-lint: ## Run linters (Rust clippy + ESLint)
+# Run linters (Rust fmt/clippy + ESLint + import aliases)
+lint: ## Run linters (Rust fmt/clippy + ESLint + import aliases)
+	@echo "Checking Rust formatting..."
+	cargo fmt --all -- --check
 	@echo "Running Rust clippy..."
 	cargo clippy --workspace --all-targets
 	@echo "Running ESLint on frontend..."
 	cd apps/interface && npm run lint
+	@echo "Checking import aliases..."
+	npm run lint:imports
 
 # Install all dependencies
 install-deps: ## Install all dependencies

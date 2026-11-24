@@ -16,10 +16,9 @@ use crate::{
     errors::ContractError,
     helpers,
     storage::{
-        DataKey, KEY_DEADLINE, KEY_GROSS_TOTAL, KEY_INSURANCE,
-        KEY_INSURANCE_POOL, KEY_MAX, KEY_MIN, KEY_PLATFORM, KEY_RATE_LIMIT, KEY_STATUS, KEY_TOKEN,
-        KEY_TOTAL, KEY_VISIBILITY, MAX_MESSAGE_LENGTH, TTL_INSTANCE_EXTEND_MAX,
-        TTL_INSTANCE_EXTEND_MIN, TTL_PERSISTENT_ENTRY,
+        DataKey, KEY_DEADLINE, KEY_GROSS_TOTAL, KEY_INSURANCE, KEY_INSURANCE_POOL, KEY_MAX,
+        KEY_MIN, KEY_PLATFORM, KEY_RATE_LIMIT, KEY_STATUS, KEY_TOKEN, KEY_TOTAL, KEY_VISIBILITY,
+        MAX_MESSAGE_LENGTH, TTL_INSTANCE_EXTEND_MAX, TTL_INSTANCE_EXTEND_MIN, TTL_PERSISTENT_ENTRY,
     },
     types::{
         ContributionHistory, Delegation, EventContributed, EventContributionRecorded,
@@ -65,17 +64,31 @@ struct CampaignSnapshot {
 fn read_campaign_snapshot(env: &Env) -> CampaignSnapshot {
     let inst = env.storage().instance();
     CampaignSnapshot {
-        status: inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
-        min: inst.get(&KEY_MIN).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
+        status: inst
+            .get(&KEY_STATUS)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
+        min: inst
+            .get(&KEY_MIN)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
         max: inst.get(&KEY_MAX).unwrap_or(0),
-        deadline: inst.get(&KEY_DEADLINE).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
-        default_token: inst.get(&KEY_TOKEN).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
+        deadline: inst
+            .get(&KEY_DEADLINE)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
+        default_token: inst
+            .get(&KEY_TOKEN)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
         rate_limit: inst.get(&KEY_RATE_LIMIT),
         visibility: inst.get(&KEY_VISIBILITY).unwrap_or(Visibility::Public),
         accepted_tokens: inst.get(&DataKey::AcceptedTokens),
-        total: inst.get(&KEY_TOTAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
-        count: inst.get(&DataKey::ContributorCount).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
-        largest: inst.get(&DataKey::LargestContribution).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
+        total: inst
+            .get(&KEY_TOTAL)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
+        count: inst
+            .get(&DataKey::ContributorCount)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
+        largest: inst
+            .get(&DataKey::LargestContribution)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound)),
         platform_config: inst.get(&KEY_PLATFORM),
         gross_total: inst.get(&KEY_GROSS_TOTAL).unwrap_or(0),
         insurance_config: inst.get(&KEY_INSURANCE),
@@ -305,8 +318,7 @@ fn apply_matching_and_total(
 
     let mut matched_amount = 0i128;
     if let Some(ref config) = snap.matching_config {
-        let match_amount = apply_bps(effective_amount, config.match_ratio)
-            .unwrap_or(0);
+        let match_amount = apply_bps(effective_amount, config.match_ratio).unwrap_or(0);
         let total_matched: i128 = inst.get(&DataKey::TotalMatched).unwrap_or(0);
         let available_match = config
             .max_match
@@ -658,13 +670,21 @@ pub(crate) fn contribute_on_behalf(
 
     // === Batch all instance reads up-front (single storage access)
     let inst = env.storage().instance();
-    let min: i128 = inst.get(&KEY_MIN).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
-    let status: Status = inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
-    let deadline: u64 = inst.get(&KEY_DEADLINE).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+    let min: i128 = inst
+        .get(&KEY_MIN)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+    let status: Status = inst
+        .get(&KEY_STATUS)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+    let deadline: u64 = inst
+        .get(&KEY_DEADLINE)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
     let max: i128 = inst.get(&KEY_MAX).unwrap_or(0);
     let whitelist_only: bool = inst.get(&DataKey::WhitelistOnly).unwrap_or(false);
     let visibility: Visibility = inst.get(&KEY_VISIBILITY).unwrap_or(Visibility::Public);
-    let total: i128 = inst.get(&KEY_TOTAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+    let total: i128 = inst
+        .get(&KEY_TOTAL)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
 
     // Perform the contribution as if delegator is contributing
     validate_min_contribution(amount, min)?;

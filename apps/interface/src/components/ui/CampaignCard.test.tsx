@@ -2,7 +2,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { CampaignCard } from "./CampaignCard";
 import type { Campaign } from "@/types/campaign";
-import { createCampaignFixture } from "../../../../../fixtures/test-factories";
+import { createCampaignFixture } from "@fixtures/test-factories";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
