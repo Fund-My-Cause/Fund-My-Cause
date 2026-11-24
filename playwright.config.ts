@@ -79,6 +79,7 @@ export default defineConfig({
     command: "npm run dev --workspace=apps/interface",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
+    env: { NEXT_PUBLIC_MSW_ENABLED: "true" },
     timeout: 120_000,
   },
 });

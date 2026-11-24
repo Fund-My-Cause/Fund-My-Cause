@@ -54,5 +54,10 @@
     "*.{ts,tsx}": [
       "bash scripts/lint-staged-check.sh"
     ]
+  },
+  "msw": {
+    "workerDirectory": [
+      "apps/interface/public"
+    ]
   }
 }
