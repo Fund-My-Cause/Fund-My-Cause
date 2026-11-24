@@ -4,17 +4,13 @@ This document provides guidance on using TypeScript effectively in the Fund-My-C
 
 ## Type Organization
 
-Types are organized into logical modules in `src/types/`:
-
-- **campaign.ts** - Campaign domain types
-- **contract.ts** - Smart contract interaction types
-- **soroban.ts** - Soroban-specific types
-- **comment.ts** - Comment types
-- **milestone.ts** - Milestone types
-- **api.ts** - API response types
-- **components.ts** - Component prop types
-- **utils.ts** - Utility and hook types
-- **index.ts** - Central export point
+Canonical API and contract DTOs live in `packages/types/src/` and are imported as
+`@fund-my-cause/types`. Domain modules include `campaign.ts`, `contract.ts`,
+`soroban.ts`, `comment.ts`, `milestone.ts`, `api.ts`, `indexer.ts` and
+`validation.ts`; `src/index.ts` is the barrel. Application-specific types stay
+under the consuming app's `src/types/` directory, which re-exports the canonical
+types rather than redeclaring them. Shared path aliases are defined in
+`tsconfig.base.json`.
 
 ## Strict Type Checking
 

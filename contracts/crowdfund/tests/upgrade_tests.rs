@@ -54,7 +54,8 @@ fn test_upgrade_preserves_state() {
 
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &1_000);
-    c.client.contribute(&contributor, &1_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &1_000, &c.token_id, &None);
 
     assert_eq!(c.client.total_raised(), 1_000);
     assert_eq!(c.client.contribution(&contributor), 1_000);
@@ -82,7 +83,8 @@ fn test_upgrade_with_platform_fee_preserves_config() {
 
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &1_000);
-    c.client.contribute(&contributor, &1_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &1_000, &c.token_id, &None);
 
     let platform_after = c.client.platform_config().expect("platform config exists");
     assert_eq!(platform_after.address, platform);
@@ -109,8 +111,10 @@ fn test_backward_compatibility_existing_storage() {
     c.token_admin.mint(&contributor1, &1_000);
     c.token_admin.mint(&contributor2, &2_000);
 
-    c.client.contribute(&contributor1, &1_000, &c.token_id, &None);
-    c.client.contribute(&contributor2, &2_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor1, &1_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor2, &2_000, &c.token_id, &None);
 
     assert!(c.client.is_contributor(&contributor1));
     assert!(c.client.is_contributor(&contributor2));
@@ -160,7 +164,8 @@ fn test_concurrent_operations_after_upgrade() {
 
     for contributor in contributors.iter() {
         c.token_admin.mint(&contributor, &1_000);
-        c.client.contribute(&contributor, &1_000, &c.token_id, &None);
+        c.client
+            .contribute(&contributor, &1_000, &c.token_id, &None);
     }
 
     c.client.pause();
@@ -196,7 +201,8 @@ fn test_upgrade_with_multiple_contributions() {
     for contributor in contributors.iter() {
         let amount = 5_000i128;
         c.token_admin.mint(&contributor, &amount);
-        c.client.contribute(&contributor, &amount, &c.token_id, &None);
+        c.client
+            .contribute(&contributor, &amount, &c.token_id, &None);
         total += amount;
     }
 
@@ -221,7 +227,8 @@ fn test_full_campaign_lifecycle_after_upgrade() {
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &5_000);
 
-    c.client.contribute(&contributor, &5_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &5_000, &c.token_id, &None);
     assert_eq!(c.client.total_raised(), 5_000);
 
     env.ledger().set_timestamp(1_000_001);
@@ -239,7 +246,8 @@ fn test_refund_full_campaign_after_upgrade() {
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &5_000);
 
-    c.client.contribute(&contributor, &5_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &5_000, &c.token_id, &None);
 
     env.ledger().set_timestamp(1_000_001);
     c.client.refund_single(&contributor);
@@ -267,7 +275,9 @@ fn test_rate_limiting_after_upgrade() {
     env.ledger().set_timestamp(200);
     c.client.contribute(&contributor, &400, &c.token_id, &None);
 
-    let result = c.client.try_contribute(&contributor, &300, &c.token_id, &None);
+    let result = c
+        .client
+        .try_contribute(&contributor, &300, &c.token_id, &None);
     assert!(result.is_err());
 }
 
@@ -278,7 +288,8 @@ fn test_extension_voting_after_upgrade() {
 
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &5_000);
-    c.client.contribute(&contributor, &5_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &5_000, &c.token_id, &None);
 
     env.ledger().set_timestamp(100);
     c.client.propose_extension(&2_000_000);
@@ -303,7 +314,8 @@ fn test_storage_migration_from_v1_layout() {
 
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &5_000);
-    c.client.contribute(&contributor, &5_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &5_000, &c.token_id, &None);
 
     assert_eq!(c.client.contribution(&contributor), 5_000);
     assert!(c.client.is_contributor(&contributor));
@@ -329,7 +341,8 @@ fn test_migration_batch_contributors() {
     for _ in 0..20 {
         let contributor = Address::generate(&env);
         c.token_admin.mint(&contributor, &1_000);
-        c.client.contribute(&contributor, &1_000, &c.token_id, &None);
+        c.client
+            .contribute(&contributor, &1_000, &c.token_id, &None);
         contributors.push_back(contributor);
     }
 
@@ -357,7 +370,8 @@ fn test_migration_preserves_complex_state() {
     for _ in 0..5 {
         let contributor = Address::generate(&env);
         c.token_admin.mint(&contributor, &2_000);
-        c.client.contribute(&contributor, &2_000, &c.token_id, &None);
+        c.client
+            .contribute(&contributor, &2_000, &c.token_id, &None);
     }
 
     c.client.pause();
@@ -377,7 +391,8 @@ fn test_failed_migration_rollback() {
 
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &5_000);
-    c.client.contribute(&contributor, &5_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &5_000, &c.token_id, &None);
 
     let original_raised = c.client.total_raised();
     let original_contribution = c.client.contribution(&contributor);
@@ -393,7 +408,8 @@ fn test_migration_with_paused_state() {
 
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &3_000);
-    c.client.contribute(&contributor, &3_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &3_000, &c.token_id, &None);
 
     c.client.pause();
 

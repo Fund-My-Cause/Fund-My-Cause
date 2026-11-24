@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const pascalCaseComponentFiles = require("./eslint-rules/pascal-case-component-files.js");
+const noMixedNullUndefined = require("./eslint-rules/no-mixed-null-undefined.js");
 
 const dummyPlugin = (ruleNames) => ({
   rules: Object.fromEntries(
@@ -86,6 +87,19 @@ export default [
           ],
         },
       ],
+    },
+  },
+  {
+    files: ["packages/types/**/*.ts"],
+    plugins: {
+      "local-rules": {
+        rules: {
+          "no-mixed-null-undefined": noMixedNullUndefined,
+        },
+      },
+    },
+    rules: {
+      "local-rules/no-mixed-null-undefined": "error",
     },
   },
   {

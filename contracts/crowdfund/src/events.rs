@@ -17,7 +17,7 @@
 //! and were renamed in the same release; see `CHANGELOG.md` for the migration
 //! note.
 
-pub use common::events::{EventEmitter, topics};
+pub use common::events::{topics, EventEmitter};
 
 use crate::types::{EventInvariantViolated, EventStateValidated};
 
@@ -217,13 +217,7 @@ mod tests {
         CrowdfundEvents::campaign_cancelled(&env, 1, creator.clone());
         CrowdfundEvents::campaign_paused(&env, 1, creator.clone());
         CrowdfundEvents::campaign_resumed(&env, 1, creator.clone());
-        CrowdfundEvents::milestone_added(
-            &env,
-            1,
-            1,
-            String::from_str(&env, "M1"),
-            500,
-        );
+        CrowdfundEvents::milestone_added(&env, 1, 1, String::from_str(&env, "M1"), 500);
         CrowdfundEvents::milestone_verified(&env, 1, 1, creator.clone());
         CrowdfundEvents::milestone_released(&env, 1, 1, creator, 500);
 

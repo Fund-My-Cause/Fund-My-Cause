@@ -18,6 +18,7 @@ export default defineConfig({
       "@design-tokens": fileURLToPath(
         new URL("../interface/src/styles/design-tokens.ts", import.meta.url),
       ),
+      "@fixtures": fileURLToPath(new URL("../../fixtures", import.meta.url)),
     },
   },
   test: {

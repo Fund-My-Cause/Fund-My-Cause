@@ -11,9 +11,11 @@
   "scripts": {
     "dev": "npm run dev --workspace=apps/interface",
     "build": "npm run build --workspace=packages/shared-utils && npm run build --workspace=apps/interface",
-    "lint": "eslint apps/interface/src apps/components-lib/src",
+    "lint": "eslint apps/interface/src apps/components-lib/src packages/types/src",
     "lint:dead-code": "npx --yes ts-prune@0.10.3 -p apps/interface/tsconfig.json",
-    "lint:all": "npm run lint && npm run lint:dead-code",
+    "lint:imports": "node scripts/check-import-aliases.mjs",
+    "lint:all": "npm run lint && npm run lint:imports && npm run lint:dead-code",
+    "test:quality": "node --test eslint-rules/__tests__/*.test.mjs scripts/__tests__/*.test.mjs",
     "test:a11y": "playwright test --grep @a11y",
     "test:contrast": "npx --yes ts-node scripts/check-contrast.ts",
     "test:unit": "npm run test --workspace=packages/shared-utils && npm run test --workspace=apps/interface",

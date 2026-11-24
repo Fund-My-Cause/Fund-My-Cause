@@ -40,7 +40,9 @@ fn title_at_the_64_character_limit_is_accepted() {
     let env = Env::default();
     let c = active_campaign(&env);
 
-    let result = c.client.try_update_metadata(&Some(text(&env, 64)), &None, &None);
+    let result = c
+        .client
+        .try_update_metadata(&Some(text(&env, 64)), &None, &None);
     assert!(matches!(result, Ok(Ok(()))));
 }
 
@@ -49,7 +51,9 @@ fn title_one_over_the_limit_is_rejected() {
     let env = Env::default();
     let c = active_campaign(&env);
 
-    let result = c.client.try_update_metadata(&Some(text(&env, 65)), &None, &None);
+    let result = c
+        .client
+        .try_update_metadata(&Some(text(&env, 65)), &None, &None);
     assert!(matches!(result, Err(Ok(ContractError::StringTooLong))));
 }
 
@@ -58,7 +62,9 @@ fn empty_title_is_rejected() {
     let env = Env::default();
     let c = active_campaign(&env);
 
-    let result = c.client.try_update_metadata(&Some(text(&env, 0)), &None, &None);
+    let result = c
+        .client
+        .try_update_metadata(&Some(text(&env, 0)), &None, &None);
     assert!(matches!(result, Err(Ok(ContractError::StringEmpty))));
 }
 
@@ -69,7 +75,9 @@ fn description_at_the_512_character_limit_is_accepted() {
     let env = Env::default();
     let c = active_campaign(&env);
 
-    let result = c.client.try_update_metadata(&None, &Some(text(&env, 512)), &None);
+    let result = c
+        .client
+        .try_update_metadata(&None, &Some(text(&env, 512)), &None);
     assert!(matches!(result, Ok(Ok(()))));
 }
 
@@ -78,7 +86,9 @@ fn description_one_over_the_limit_is_rejected() {
     let env = Env::default();
     let c = active_campaign(&env);
 
-    let result = c.client.try_update_metadata(&None, &Some(text(&env, 513)), &None);
+    let result = c
+        .client
+        .try_update_metadata(&None, &Some(text(&env, 513)), &None);
     assert!(matches!(result, Err(Ok(ContractError::StringTooLong))));
 }
 
@@ -87,7 +97,9 @@ fn empty_description_is_rejected() {
     let env = Env::default();
     let c = active_campaign(&env);
 
-    let result = c.client.try_update_metadata(&None, &Some(text(&env, 0)), &None);
+    let result = c
+        .client
+        .try_update_metadata(&None, &Some(text(&env, 0)), &None);
     assert!(matches!(result, Err(Ok(ContractError::StringEmpty))));
 }
 
@@ -98,7 +110,9 @@ fn a_rejected_update_leaves_the_stored_title_unchanged() {
     c.client
         .update_metadata(&Some(text(&env, 10)), &None, &None);
 
-    let _ = c.client.try_update_metadata(&Some(text(&env, 65)), &None, &None);
+    let _ = c
+        .client
+        .try_update_metadata(&Some(text(&env, 65)), &None, &None);
 
     // The accepted 10-character title is still the one in the history.
     let history = c.client.get_metadata_history();

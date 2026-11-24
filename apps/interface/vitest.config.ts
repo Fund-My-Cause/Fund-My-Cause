@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@fixtures": fileURLToPath(new URL("../../fixtures", import.meta.url)),
       // Workspace packages ship TypeScript source — point at it directly so
       // vitest transforms them instead of choking on the bare specifier.
       "@fund-my-cause/components": fileURLToPath(

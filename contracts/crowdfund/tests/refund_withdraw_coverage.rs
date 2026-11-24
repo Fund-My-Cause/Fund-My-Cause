@@ -5,7 +5,10 @@
 
 #![cfg(test)]
 
-use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env, Vec};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    Address, Env, Vec,
+};
 
 use crowdfund::{ContractError, CrowdfundContract, CrowdfundContractClient};
 
@@ -97,7 +100,11 @@ fn refund_single_cancelled_with_partial_release_returns_unreleased_portion() {
     let after = c.token.balance(&contributor);
 
     // Contributor should receive only the unreleased 50 %.
-    assert_eq!(after - before, 500, "only unreleased portion should be refunded");
+    assert_eq!(
+        after - before,
+        500,
+        "only unreleased portion should be refunded"
+    );
     assert_eq!(c.client.contribution(&contributor), 0);
 }
 

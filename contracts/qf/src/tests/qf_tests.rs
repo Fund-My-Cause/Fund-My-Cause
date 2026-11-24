@@ -1,7 +1,7 @@
 #![cfg(test)]
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, Map};
 use proptest::prelude::*;
+use soroban_sdk::{testutils::Address as _, Address, Env, Map};
 
 /// Property: QF calculation is deterministic
 proptest! {
@@ -120,13 +120,7 @@ fn test_calculate_qf_rejects_zero_pool() {
     contributions.set(addr.clone(), 1000);
     contributor_counts.set(addr, 5);
 
-    let result = QFContract::calculate_qf(
-        env.clone(),
-        0,
-        contributions,
-        contributor_counts,
-        0,
-    );
+    let result = QFContract::calculate_qf(env.clone(), 0, contributions, contributor_counts, 0);
     assert_eq!(result, Err(QFError::InvalidPoolAmount));
 }
 
@@ -140,13 +134,7 @@ fn test_calculate_qf_rejects_negative_pool() {
     contributions.set(addr.clone(), 1000);
     contributor_counts.set(addr, 5);
 
-    let result = QFContract::calculate_qf(
-        env.clone(),
-        -100,
-        contributions,
-        contributor_counts,
-        0,
-    );
+    let result = QFContract::calculate_qf(env.clone(), -100, contributions, contributor_counts, 0);
     assert_eq!(result, Err(QFError::InvalidPoolAmount));
 }
 
@@ -157,13 +145,8 @@ fn test_calculate_qf_rejects_empty_contributions() {
     let contributions = Map::new(&env);
     let contributor_counts = Map::new(&env);
 
-    let result = QFContract::calculate_qf(
-        env.clone(),
-        10_000,
-        contributions,
-        contributor_counts,
-        0,
-    );
+    let result =
+        QFContract::calculate_qf(env.clone(), 10_000, contributions, contributor_counts, 0);
     assert_eq!(result, Err(QFError::NoContributions));
 }
 
@@ -182,13 +165,9 @@ fn test_calculate_qf_deterministic_no_replay() {
     contributor_counts1.set(addr1.clone(), 10);
     contributor_counts1.set(addr2.clone(), 7);
 
-    let result1 = QFContract::calculate_qf(
-        env.clone(),
-        100_000,
-        contributions1,
-        contributor_counts1,
-        0,
-    ).unwrap();
+    let result1 =
+        QFContract::calculate_qf(env.clone(), 100_000, contributions1, contributor_counts1, 0)
+            .unwrap();
 
     let mut contributions2 = Map::new(&env);
     let mut contributor_counts2 = Map::new(&env);
@@ -197,13 +176,9 @@ fn test_calculate_qf_deterministic_no_replay() {
     contributor_counts2.set(addr1.clone(), 10);
     contributor_counts2.set(addr2.clone(), 7);
 
-    let result2 = QFContract::calculate_qf(
-        env.clone(),
-        100_000,
-        contributions2,
-        contributor_counts2,
-        0,
-    ).unwrap();
+    let result2 =
+        QFContract::calculate_qf(env.clone(), 100_000, contributions2, contributor_counts2, 0)
+            .unwrap();
 
     assert_eq!(result1.total_distributed, result2.total_distributed);
     assert_eq!(result1.remaining_pool, result2.remaining_pool);
@@ -221,13 +196,8 @@ fn test_calculate_qf_below_threshold_gets_no_matching() {
     contributions.set(addr.clone(), 500);
     contributor_counts.set(addr, 3);
 
-    let result = QFContract::calculate_qf(
-        env.clone(),
-        10_000,
-        contributions,
-        contributor_counts,
-        1000,
-    );
+    let result =
+        QFContract::calculate_qf(env.clone(), 10_000, contributions, contributor_counts, 1000);
 
     if let Ok(r) = result {
         assert_eq!(r.recipients_funded, 0);
@@ -247,13 +217,8 @@ fn test_calculate_qf_zero_contributor_count() {
     contributions.set(addr.clone(), 5000);
     contributor_counts.set(addr, 0);
 
-    let result = QFContract::calculate_qf(
-        env.clone(),
-        10_000,
-        contributions,
-        contributor_counts,
-        0,
-    );
+    let result =
+        QFContract::calculate_qf(env.clone(), 10_000, contributions, contributor_counts, 0);
 
     if let Ok(r) = result {
         assert_eq!(r.recipients_funded, 0);
@@ -272,13 +237,8 @@ fn test_calculate_qf_negative_contribution_skipped() {
     contributions.set(addr.clone(), -500);
     contributor_counts.set(addr, 5);
 
-    let result = QFContract::calculate_qf(
-        env.clone(),
-        10_000,
-        contributions,
-        contributor_counts,
-        0,
-    );
+    let result =
+        QFContract::calculate_qf(env.clone(), 10_000, contributions, contributor_counts, 0);
 
     if let Ok(r) = result {
         assert_eq!(r.recipients_funded, 0);

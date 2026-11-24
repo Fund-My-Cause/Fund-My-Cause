@@ -96,7 +96,6 @@
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::unused_self)]
-=======
 
 mod achievements;
 mod errors;
@@ -116,10 +115,10 @@ pub use storage::*;
 pub use types::*;
 pub use validation::*;
 
+use crate::storage::KEY_AUTHORIZED_CALLER;
 use common::math::{proportional, REWARD_DIVISOR};
 use common::{AccessControl, CommonError, EventEmitter, EVENT_SCHEMA_VERSION};
 use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, String, Vec};
-use crate::storage::KEY_AUTHORIZED_CALLER;
 
 /// Main achievement contract
 #[contract]
@@ -384,10 +383,7 @@ impl AchievementsContract {
     /// # Errors
     ///
     /// * [`ContractError::Unauthorized`] if the caller is not the admin.
-    pub fn add_authorized_caller(
-        env: Env,
-        caller: Address,
-    ) -> Result<(), ContractError> {
+    pub fn add_authorized_caller(env: Env, caller: Address) -> Result<(), ContractError> {
         let admin: Address = env
             .storage()
             .instance()
@@ -437,10 +433,8 @@ impl AchievementsContract {
         // achievement tracking on behalf of users during a cross-contract
         // contribute flow, without requiring each user to additionally sign
         // the achievements transaction.
-        let authorized_caller: Option<Address> = env
-            .storage()
-            .instance()
-            .get(&KEY_AUTHORIZED_CALLER);
+        let authorized_caller: Option<Address> =
+            env.storage().instance().get(&KEY_AUTHORIZED_CALLER);
         if let Some(ref caller) = authorized_caller {
             if caller != &user {
                 caller.require_auth();

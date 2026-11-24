@@ -121,11 +121,21 @@ impl CachedInstanceView {
     pub(crate) fn load(env: &Env) -> Self {
         let inst = env.storage().instance();
 
-        let creator: Address = inst.get(&KEY_CREATOR).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
-        let token: Address = inst.get(&KEY_TOKEN).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
-        let goal: i128 = inst.get(&KEY_GOAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
-        let deadline: u64 = inst.get(&KEY_DEADLINE).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
-        let min_contribution: i128 = inst.get(&KEY_MIN).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let creator: Address = inst
+            .get(&KEY_CREATOR)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let token: Address = inst
+            .get(&KEY_TOKEN)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let goal: i128 = inst
+            .get(&KEY_GOAL)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let deadline: u64 = inst
+            .get(&KEY_DEADLINE)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let min_contribution: i128 = inst
+            .get(&KEY_MIN)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         let max_contribution: i128 = inst.get(&KEY_MAX).unwrap_or(0);
         let title: String = inst
             .get(&KEY_TITLE)
@@ -133,7 +143,9 @@ impl CachedInstanceView {
         let description: String = inst
             .get(&KEY_DESC)
             .unwrap_or_else(|| String::from_str(env, ""));
-        let status: Status = inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let status: Status = inst
+            .get(&KEY_STATUS)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         let category: Category = inst.get(&KEY_CATEGORY).unwrap_or(Category::Other);
         let total: i128 = inst.get(&KEY_TOTAL).unwrap_or(0);
         let platform_config: Option<PlatformConfig> = inst.get(&KEY_PLATFORM);
@@ -267,22 +279,34 @@ pub(crate) fn total_raised(env: Env) -> i128 {
 
 /// Returns the campaign creator's Stellar address.
 pub(crate) fn creator(env: Env) -> Address {
-    env.storage().instance().get(&KEY_CREATOR).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound))
+    env.storage()
+        .instance()
+        .get(&KEY_CREATOR)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound))
 }
 
 /// Returns the current campaign status.
 pub(crate) fn status(env: Env) -> Status {
-    env.storage().instance().get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound))
+    env.storage()
+        .instance()
+        .get(&KEY_STATUS)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound))
 }
 
 /// Returns the campaign funding goal in stroops.
 pub(crate) fn goal(env: Env) -> i128 {
-    env.storage().instance().get(&KEY_GOAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound))
+    env.storage()
+        .instance()
+        .get(&KEY_GOAL)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound))
 }
 
 /// Returns the campaign deadline as a Unix timestamp (seconds).
 pub(crate) fn deadline(env: Env) -> u64 {
-    env.storage().instance().get(&KEY_DEADLINE).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound))
+    env.storage()
+        .instance()
+        .get(&KEY_DEADLINE)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound))
 }
 
 /// Returns the total contribution amount for a specific contributor in stroops.
@@ -304,7 +328,10 @@ pub(crate) fn is_contributor(env: Env, address: Address) -> bool {
 
 /// Returns the minimum contribution amount in stroops.
 pub(crate) fn min_contribution(env: Env) -> i128 {
-    env.storage().instance().get(&KEY_MIN).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound))
+    env.storage()
+        .instance()
+        .get(&KEY_MIN)
+        .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound))
 }
 
 /// Returns the maximum contribution amount per contributor in stroops (0 = no limit).
@@ -579,7 +606,12 @@ mod tests {
         platform: Option<PlatformConfig>,
         vesting: Option<VestingSchedule>,
         category: Category,
-    ) -> (Address, Address, CrowdfundContractClient<'_>, token::StellarAssetClient<'_>) {
+    ) -> (
+        Address,
+        Address,
+        CrowdfundContractClient<'_>,
+        token::StellarAssetClient<'_>,
+    ) {
         let creator = Address::generate(env);
         let token_admin = Address::generate(env);
         let token_id = env.register_stellar_asset_contract(token_admin.clone());
@@ -750,7 +782,10 @@ mod tests {
         let (_, token_id, client, token_admin) = setup_contract(
             &env,
             None,
-            Some(VestingSchedule { cliff: 2_000, duration: 5_000 }),
+            Some(VestingSchedule {
+                cliff: 2_000,
+                duration: 5_000,
+            }),
             Category::Other,
         );
         contribute(&env, &client, &token_id, &token_admin, 10_000);
@@ -768,7 +803,10 @@ mod tests {
         let (_, token_id, client, token_admin) = setup_contract(
             &env,
             None,
-            Some(VestingSchedule { cliff: 200, duration: 500 }),
+            Some(VestingSchedule {
+                cliff: 200,
+                duration: 500,
+            }),
             Category::Other,
         );
         contribute(&env, &client, &token_id, &token_admin, 10_000);
@@ -786,7 +824,10 @@ mod tests {
         let (_, token_id, client, token_admin) = setup_contract(
             &env,
             None,
-            Some(VestingSchedule { cliff: 0, duration: 1_000 }),
+            Some(VestingSchedule {
+                cliff: 0,
+                duration: 1_000,
+            }),
             Category::Other,
         );
         contribute(&env, &client, &token_id, &token_admin, 10_000);

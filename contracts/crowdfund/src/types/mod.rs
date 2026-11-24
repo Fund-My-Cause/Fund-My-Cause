@@ -36,9 +36,7 @@ pub use withdrawal::{
 };
 
 // ── Re-export all domain types ────────────────────────────────────────────────
-pub use domain::{
-    DataKey, Status,
-};
+pub use domain::{DataKey, Status};
 
 // ── Re-export all event types ─────────────────────────────────────────────────
 pub use events::{
@@ -59,9 +57,7 @@ pub use events::{
         EventRecurringSetup, EventRewardsConfigured, EventRewardsDistributed, EventTierAssigned,
         EventWhitelistRemoved, EventWhitelisted,
     },
-    refund::{
-        EventRefunded,
-    },
+    refund::EventRefunded,
     withdrawal::{
         EventAnalyticsGenerated, EventContractMigrated, EventDebugLog, EventDebugSnapshot,
         EventDisputeFiled, EventDisputeResolved, EventDisputeVoted, EventEmergencyApproved,

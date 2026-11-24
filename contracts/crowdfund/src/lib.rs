@@ -75,7 +75,6 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
-=======
 
 use common::math::{proportional, REWARD_DIVISOR};
 
@@ -143,9 +142,7 @@ pub mod fuzz_api {
 
 pub use errors::ContractError;
 pub use security::{CircuitBreaker, ContributorGate, InputValidator, RateLimiter, ReentrancyGuard};
-pub use validation::{
-    MAX_RECURRING_EXECUTIONS, MAX_RECURRING_INTERVAL, MIN_RECURRING_INTERVAL,
-};
+pub use validation::{MAX_RECURRING_EXECUTIONS, MAX_RECURRING_INTERVAL, MIN_RECURRING_INTERVAL};
 
 use access::auth_admin;
 use helpers::require_auth_creator;
@@ -336,6 +333,7 @@ pub use types::{
     // #698
     FeeMode,
     FunctionPerfStats,
+    FundingMilestone,
     GoalAdjustment,
     // Governance
     GovernanceConfig,
@@ -344,7 +342,6 @@ pub use types::{
     MatchingConfig,
     // Issue #423
     MetadataVersion,
-    FundingMilestone,
     MilestoneStatus,
     // #443
     PerformanceMetrics,
@@ -1239,12 +1236,16 @@ impl CrowdfundContract {
     /// * `Err(ContractError::NotActive)` if campaign is not Active
     pub fn update_category(env: Env, category: Category) -> Result<(), ContractError> {
         let inst = env.storage().instance();
-        let status: Status = inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let status: Status = inst
+            .get(&KEY_STATUS)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         if status != Status::Active {
             return Err(ContractError::NotActive);
         }
         validate_category(&category)?;
-        let creator: Address = inst.get(&KEY_CREATOR).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let creator: Address = inst
+            .get(&KEY_CREATOR)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         common::AccessControl::require_role_auth(&creator);
 
         let old_category: Category = inst.get(&KEY_CATEGORY).unwrap_or(Category::Other);
@@ -1406,7 +1407,9 @@ impl CrowdfundContract {
         let inst = env.storage().instance();
         let creator = require_auth_creator(&env)?;
 
-        let current_deadline: u64 = inst.get(&KEY_DEADLINE).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let current_deadline: u64 = inst
+            .get(&KEY_DEADLINE)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         validate_deadline_extension(new_deadline, current_deadline)?;
 
         let now = env.ledger().timestamp();
@@ -1527,7 +1530,12 @@ impl CrowdfundContract {
             .votes_for
             .checked_add(proposal.votes_against)
             .ok_or(ContractError::Overflow)?;
-        if total_votes > 0 && proposal.votes_for.checked_mul(2).map_or(true, |doubled| doubled > total_votes) {
+        if total_votes > 0
+            && proposal
+                .votes_for
+                .checked_mul(2)
+                .map_or(true, |doubled| doubled > total_votes)
+        {
             inst.set(&KEY_DEADLINE, &proposal.new_deadline);
             env.events().publish(
                 ("crowdfund", "extension_executed"),
@@ -2406,11 +2414,19 @@ impl CrowdfundContract {
         common::AccessControl::require_role_auth(&contributor);
 
         let inst = env.storage().instance();
-        let status: Status = inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let status: Status = inst
+            .get(&KEY_STATUS)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         if status != Status::Cancelled {
-            let deadline: u64 = inst.get(&KEY_DEADLINE).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
-            let goal: i128 = inst.get(&KEY_GOAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
-            let total: i128 = inst.get(&KEY_TOTAL).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+            let deadline: u64 = inst
+                .get(&KEY_DEADLINE)
+                .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+            let goal: i128 = inst
+                .get(&KEY_GOAL)
+                .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+            let total: i128 = inst
+                .get(&KEY_TOTAL)
+                .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
             validate_refund_eligibility(env.ledger().timestamp(), deadline, total, goal)?;
         }
 
@@ -2425,7 +2441,9 @@ impl CrowdfundContract {
             return Err(ContractError::InsufficientFunds);
         }
 
-        let token_address: Address = inst.get(&KEY_TOKEN).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let token_address: Address = inst
+            .get(&KEY_TOKEN)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         token::Client::new(&env, &token_address).transfer(
             &env.current_contract_address(),
             &contributor,
@@ -2577,11 +2595,19 @@ impl CrowdfundContract {
     /// * `Ok(())` on success
     pub fn index_campaign(env: Env) -> Result<(), ContractError> {
         let inst = env.storage().instance();
-        let title: String = inst.get(&KEY_TITLE).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
-        let description: String = inst.get(&KEY_DESC).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
-        let category: Category = inst.get(&KEY_CATEGORY).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let title: String = inst
+            .get(&KEY_TITLE)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let description: String = inst
+            .get(&KEY_DESC)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let category: Category = inst
+            .get(&KEY_CATEGORY)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
         let visibility: Visibility = inst.get(&KEY_VISIBILITY).unwrap_or(Visibility::Public);
-        let status: Status = inst.get(&KEY_STATUS).unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
+        let status: Status = inst
+            .get(&KEY_STATUS)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, ContractError::NotFound));
 
         let index = SearchIndexEntry {
             title: title.clone(),
@@ -2977,7 +3003,10 @@ impl CrowdfundContract {
     ///
     /// Only the creator can call this function. Milestones define target amounts
     /// that trigger fund releases when reached and verified.
-    pub fn set_milestones(env: Env, milestones: Vec<FundingMilestone>) -> Result<(), ContractError> {
+    pub fn set_milestones(
+        env: Env,
+        milestones: Vec<FundingMilestone>,
+    ) -> Result<(), ContractError> {
         let creator: Address = env
             .storage()
             .instance()

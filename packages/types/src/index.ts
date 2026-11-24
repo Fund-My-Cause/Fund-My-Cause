@@ -20,7 +20,13 @@ export type {
 
 export type { Milestone, MilestoneInput } from "./milestone";
 
-export type { Comment, CommentInput, CommentVote } from "./comment";
+export type {
+  Comment,
+  CommentInput,
+  CommentVote,
+  ModerationAction,
+  SpamReport,
+} from "./comment";
 
 export type { IndexerEvent } from "./indexer";
 

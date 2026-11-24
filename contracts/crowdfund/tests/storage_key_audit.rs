@@ -127,17 +127,17 @@ fn every_persistent_data_key_write_extends_ttl() {
     let ttl_needle = "persistent().extend_ttl(&DataKey::";
     let mut writes = 0;
 
-        for source in &sources {
-            for (idx, _) in source.match_indices(set_needle) {
-                writes += 1;
-                let end = source.len().min(idx + 320);
-                let window = source.get(idx..end).unwrap_or(&source[idx..]);
-                assert!(
-                    window.contains(ttl_needle),
-                    "a persistent DataKey write is not followed by a TTL bump: {window}"
-                );
-            }
+    for source in &sources {
+        for (idx, _) in source.match_indices(set_needle) {
+            writes += 1;
+            let end = source.len().min(idx + 320);
+            let window = source.get(idx..end).unwrap_or(&source[idx..]);
+            assert!(
+                window.contains(ttl_needle),
+                "a persistent DataKey write is not followed by a TTL bump: {window}"
+            );
         }
+    }
 
     assert!(writes > 0, "expected at least one persistent DataKey write");
 }
@@ -170,7 +170,10 @@ fn every_persistent_key_is_extended_on_write() {
             }
         }
 
-        assert!(writes > 0, "{name} is documented as persistent but never written");
+        assert!(
+            writes > 0,
+            "{name} is documented as persistent but never written"
+        );
     }
 }
 

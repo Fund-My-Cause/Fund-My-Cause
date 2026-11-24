@@ -21,7 +21,11 @@
  *   we convert to ISO-8601 strings via new Date(Number(stroops) * 1000).toISOString().
  */
 
-import type { CampaignStatus } from "@fund-my-cause/types";
+import type {
+  CampaignStatus,
+  RawCampaignInfo as CanonicalRawCampaignInfo,
+  RawCampaignStats as CanonicalRawCampaignStats,
+} from "@fund-my-cause/types";
 
 // ---------------------------------------------------------------------------
 // Raw contract return shapes
@@ -30,22 +34,17 @@ import type { CampaignStatus } from "@fund-my-cause/types";
 /**
  * Raw return type of the crowdfund contract's `get_campaign_info` view.
  * Field names are snake_case, mirroring the Soroban SDK's scValToNative output.
+ * The canonical shape is reused for every field except status/category: raw
+ * contract payloads can carry values outside the canonical enums and the
+ * mapper normalises them.
  */
-export interface RawCampaignInfo {
-  creator: string;
-  token: string;
-  goal: bigint;
-  deadline: bigint;
-  min_contribution: bigint;
-  max_contribution: bigint;
-  title: string;
-  description: string;
+export type RawCampaignInfo = Omit<
+  CanonicalRawCampaignInfo,
+  "status" | "category"
+> & {
   status: string;
   category: string;
-  has_platform_config: boolean;
-  platform_fee_bps: number;
-  platform_address: string;
-}
+};
 
 /**
  * Minimal Campaign DTO shape used by the mappers.
@@ -75,17 +74,10 @@ export interface MappedCampaign {
 }
 
 /**
- * Raw stats returned by `get_stats` on the crowdfund contract.
+ * Raw stats returned by `get_stats` on the crowdfund contract. Optional here
+ * because callers may only have a subset of the canonical view's fields.
  */
-export interface RawCampaignStats {
-  total_raised: bigint;
-  gross_raised?: bigint;
-  goal: bigint;
-  progress_bps?: number;
-  contributor_count: number;
-  average_contribution?: bigint;
-  largest_contribution?: bigint;
-}
+export type RawCampaignStats = Partial<CanonicalRawCampaignStats>;
 
 /**
  * Minimal Contribution DTO shape.

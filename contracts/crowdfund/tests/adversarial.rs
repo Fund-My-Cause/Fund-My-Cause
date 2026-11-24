@@ -526,8 +526,10 @@ fn test_adversarial_replay_of_contribution_state() {
     c.token_admin.mint(&contributor, &5_000);
     env.ledger().set_timestamp(500);
 
-    c.client.contribute(&contributor, &2_000, &c.token_id, &None);
-    c.client.contribute(&contributor, &1_500, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &2_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &1_500, &c.token_id, &None);
 
     assert_eq!(c.client.contribution(&contributor), 3_500);
     assert_eq!(c.client.total_raised(), 3_500);

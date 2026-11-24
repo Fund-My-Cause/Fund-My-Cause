@@ -163,12 +163,18 @@ mod tests {
 
     #[test]
     fn negative_min_or_max_is_invalid() {
-        assert_eq!(validate_amount_range(-1, 100), Err(CommonError::InvalidInput));
+        assert_eq!(
+            validate_amount_range(-1, 100),
+            Err(CommonError::InvalidInput)
+        );
         assert_eq!(validate_amount_range(0, -1), Err(CommonError::InvalidInput));
     }
 
     #[test]
     fn max_less_than_min_is_invalid() {
-        assert_eq!(validate_amount_range(200, 100), Err(CommonError::InvalidInput));
+        assert_eq!(
+            validate_amount_range(200, 100),
+            Err(CommonError::InvalidInput)
+        );
     }
 }

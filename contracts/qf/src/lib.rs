@@ -164,9 +164,7 @@ impl QuadraticFunding {
             let sqrt = Self::integer_sqrt(count);
             if sqrt > 0 {
                 sqrt_values.set(recipient, sqrt);
-                total_sqrt_sum = total_sqrt_sum
-                    .checked_add(sqrt)
-                    .ok_or(QFError::Overflow)?;
+                total_sqrt_sum = total_sqrt_sum.checked_add(sqrt).ok_or(QFError::Overflow)?;
             }
         }
 
@@ -228,7 +226,8 @@ impl QuadraticFunding {
             return Err(QFError::NegativePayout);
         }
 
-        let remaining_pool = input.matching_pool
+        let remaining_pool = input
+            .matching_pool
             .checked_sub(total_distributed)
             .ok_or(QFError::Overflow)?;
 
@@ -311,11 +310,11 @@ impl QFContract {
 }
 
 #[cfg(test)]
-#[path = "tests/qf_tests.rs"]
-mod qf_tests;
-#[cfg(test)]
 #[path = "tests/invariants.rs"]
 mod invariants_tests;
+#[cfg(test)]
+#[path = "tests/qf_tests.rs"]
+mod qf_tests;
 
 #[cfg(test)]
 mod common_error_mapping_tests {
@@ -329,7 +328,10 @@ mod common_error_mapping_tests {
             QFError::from(CommonError::Unauthorized),
             QFError::InvalidPoolAmount
         );
-        assert_eq!(QFError::from(CommonError::NotFound), QFError::NoContributions);
+        assert_eq!(
+            QFError::from(CommonError::NotFound),
+            QFError::NoContributions
+        );
         assert_eq!(
             QFError::from(CommonError::InvalidInput),
             QFError::NegativeContribution
@@ -346,7 +348,10 @@ mod common_error_mapping_tests {
             QFError::from(CommonError::NotInitialized),
             QFError::NoContributions
         );
-        assert_eq!(QFError::from(CommonError::Paused), QFError::InvalidPoolAmount);
+        assert_eq!(
+            QFError::from(CommonError::Paused),
+            QFError::InvalidPoolAmount
+        );
         assert_eq!(QFError::from(CommonError::Overflow), QFError::Overflow);
     }
 }
