@@ -1,9 +1,21 @@
 import "@testing-library/jest-dom";
-import { expect } from "vitest";
+import { afterEach, expect } from "vitest";
+import { axe } from "jest-axe";
 import * as matchers from "jest-axe/extend-expect";
 
 // Register jest-axe matchers (e.g. toHaveNoViolations) for accessibility tests.
 expect.extend(matchers);
+
+process.env.RTL_SKIP_AUTO_CLEANUP = "true";
+
+afterEach(async () => {
+  try {
+    expect(await axe(document.body)).toHaveNoViolations();
+  } finally {
+    const { cleanup } = await import("@testing-library/react");
+    cleanup();
+  }
+});
 
 // Polyfill matchMedia for components that rely on media queries (e.g. reduced motion,
 // color scheme, responsive breakpoints) during keyboard navigation and contrast tests.
