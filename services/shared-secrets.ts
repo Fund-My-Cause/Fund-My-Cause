@@ -1,6 +1,3 @@
-cd ~/Desktop/007/Fund-My-Cause
-
-cat > services/shared-secrets.ts << 'EOF'
 /**
  * Centralized secrets management module.
  *
@@ -13,6 +10,8 @@ cat > services/shared-secrets.ts << 'EOF'
  *  - `SecretProvider` abstraction allows tests to inject mocked sources.
  *  - Values are read at call-time — no stale caching across environments.
  */
+
+import { AppError } from "@fund-my-cause/shared-utils";
 
 // ───────────────────────── Logger ─────────────────────────
 const logger = console;
@@ -77,13 +76,13 @@ function validateSecret(name: string, value: string | undefined): void {
 
   if (isKnownDefault(value)) {
     throw new Error(
-      `Secret '${name}' appears to be a default/example value and must be changed`
+      `Secret '${name}' appears to be a default/example value and must be changed`,
     );
   }
 
   if (value.length < 32) {
     logger.warn(
-      `Secret '${name}' is shorter than 32 characters; consider using a stronger value`
+      `Secret '${name}' is shorter than 32 characters; consider using a stronger value`,
     );
   }
 }
@@ -123,13 +122,11 @@ export function loadPagerDutyApiKey(): string | undefined {
   const key = activeProvider.get("PAGERDUTY_API_KEY");
   if (key && isKnownDefault(key)) {
     throw new Error(
-      "PAGERDUTY_API_KEY appears to be a default/example value and must be changed"
+      "PAGERDUTY_API_KEY appears to be a default/example value and must be changed",
     );
   }
   if (key && key.length < 20) {
-    logger.warn(
-      "PAGERDUTY_API_KEY appears to be too short for a valid API key"
-    );
+    logger.warn("PAGERDUTY_API_KEY appears to be too short for a valid API key");
   }
   return key;
 }
@@ -140,9 +137,7 @@ export function loadPagerDutyApiKey(): string | undefined {
 export function loadRedisUrl(): string {
   const url = activeProvider.get("REDIS_URL") || "redis://localhost:6379";
   if (isKnownDefault(url)) {
-    throw new Error(
-      "REDIS_URL appears to be a default value and must be changed"
-    );
+    throw new Error("REDIS_URL appears to be a default value and must be changed");
   }
   return url;
 }
@@ -154,12 +149,12 @@ export function loadDatabaseUrl(): string | undefined {
   const url = activeProvider.get("DATABASE_URL");
   if (url && isKnownDefault(url)) {
     throw new Error(
-      "DATABASE_URL appears to be a default value and must be changed"
+      "DATABASE_URL appears to be a default value and must be changed",
     );
   }
   if (url && url.includes("password")) {
     logger.warn(
-      "DATABASE_URL contains password in connection string; use environment variables"
+      "DATABASE_URL contains password in connection string; use environment variables",
     );
   }
   return url;
@@ -207,9 +202,12 @@ export const SECRET_KEYS = [
 
 export type SecretKey = (typeof SECRET_KEYS)[number];
 
-export class MissingSecretError extends Error {
+export class MissingSecretError extends AppError {
   constructor(public readonly key: SecretKey) {
-    super(`Missing required secret: ${key}`);
+    super("MISSING_SECRET", `Missing required secret: ${key}`, {
+      severity: "fatal",
+      context: { key },
+    });
     this.name = "MissingSecretError";
   }
 }
@@ -247,4 +245,3 @@ export const secrets = {
 export function getSecret(key: string): string | undefined {
   return activeProvider.get(key);
 }
-EOF

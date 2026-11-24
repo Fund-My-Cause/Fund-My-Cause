@@ -9,12 +9,22 @@
  * generic REST wrapper.
  */
 
-export class ApiError extends Error {
+import { AppError } from "@/lib/errors";
+
+export class ApiError extends AppError {
   readonly status: number;
   readonly info: unknown;
 
   constructor(message: string, status: number, info?: unknown) {
-    super(message);
+    super(
+      status === 401 ? "UNAUTHENTICATED" :
+      status === 403 ? "FORBIDDEN" :
+      status === 404 ? "NOT_FOUND" :
+      status >= 500  ? "NETWORK_REQUEST_FAILED" :
+                       "NETWORK_REQUEST_FAILED",
+      message,
+      { severity: status >= 500 ? "error" : "warn", context: { status } },
+    );
     this.name = "ApiError";
     this.status = status;
     this.info = info;

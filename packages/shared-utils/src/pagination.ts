@@ -81,10 +81,15 @@ export interface PaginationArgs {
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 
+import { AppError } from "./errors.js";
+
 /** Thrown when a cursor string cannot be decoded. */
-export class CursorDecodeError extends Error {
+export class CursorDecodeError extends AppError {
   constructor(cursor: string) {
-    super(`Invalid pagination cursor: "${cursor}"`);
+    super("CURSOR_INVALID", `Invalid pagination cursor: "${cursor}"`, {
+      severity: "warn",
+      context: { cursor },
+    });
     this.name = "CursorDecodeError";
   }
 }
