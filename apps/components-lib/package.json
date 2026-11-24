@@ -77,6 +77,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "cd ../.. && eslint apps/components-lib/src",
     "test": "vitest",
+    "test:coverage": "vitest run --coverage",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build"
   },
